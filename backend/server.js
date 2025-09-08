@@ -1,0 +1,140 @@
+// Import required modules
+const express = require("express");
+const http = require("http");
+const socketIo = require("socket.io");
+const cors = require("cors");
+require("dotenv").config();
+
+// Initialize Express app and HTTP server
+const app = express();
+const server = http.createServer(app);
+
+// Configure Socket.IO with CORS
+const io = socketIo(server, {
+  cors: {
+    origin: "*", // Allow all origins for development. Restrict in production.
+    methods: ["GET", "POST"],
+  },
+});
+
+// Use CORS middleware for Express
+app.use(cors());
+
+// In-memory data stores for rooms and their users
+// rooms structure: { roomId: { password: "...", users: { socketId: "username", ... } } }
+const rooms = {};
+const MAX_USERS_PER_ROOM = 5;
+
+// A simple root route for health checks
+app.get("/", (req, res) => {
+  res.json({ message: "Video Call Server is running" });
+});
+
+// Handle new socket connections
+io.on("connection", (socket) => {
+  console.log(`�� User connected: ${socket.id}`);
+
+  // Event listener for a user joining a room
+  socket.on("join-room", (data) => {
+    const { roomId, password, username } = data;
+
+    // --- Room Validation ---
+    // If the room doesn't exist, create it with the provided password
+    if (!rooms[roomId]) {
+      rooms[roomId] = {
+        password: password,
+        users: {},
+      };
+      console.log(`🚪 Room created: ${roomId}`);
+    }
+
+    // Check if the provided password is correct
+    if (rooms[roomId].password !== password) {
+      socket.emit("join-error", { message: "Invalid room password." });
+      console.log(`🚫 Invalid password for room ${roomId} from ${socket.id}`);
+      return;
+    }
+
+    // Check if the room is already full
+    const userCount = Object.keys(rooms[roomId].users).length;
+    if (userCount >= MAX_USERS_PER_ROOM) {
+      socket.emit("room-full");
+      console.log(
+        `🈵 Room ${roomId} is full. Connection rejected for ${socket.id}`
+      );
+      return;
+    }
+
+    // --- Join Logic ---
+    // Add the user to the room and join the socket to the room's channel
+    rooms[roomId].users[socket.id] = username;
+    socket.join(roomId);
+    console.log(`�� User ${username} (${socket.id}) joined room: ${roomId}`);
+
+    // Get a list of all other users currently in the room with their usernames
+    const otherUsers = Object.keys(rooms[roomId].users)
+      .filter((id) => id !== socket.id)
+      .map((id) => ({
+        socketId: id,
+        username: rooms[roomId].users[id],
+      }));
+
+    // Send the list of other users to the new user
+    socket.emit("all-users", otherUsers);
+
+    // Notify all other users in the room that a new user has joined
+    socket.to(roomId).emit("user-joined", { socketId: socket.id, username });
+  });
+
+  // Forward WebRTC signaling offers to the target user
+  socket.on("offer", (payload) => {
+    io.to(payload.target).emit("offer", payload);
+  });
+
+  // Forward WebRTC signaling answers to the target user
+  socket.on("answer", (payload) => {
+    io.to(payload.target).emit("answer", payload);
+  });
+
+  // Forward ICE candidates to the target user
+  socket.on("ice-candidate", (payload) => {
+    // Add sender field for proper handling on client side
+    const payloadWithSender = {
+      ...payload,
+      sender: socket.id,
+    };
+    io.to(payload.target).emit("ice-candidate", payloadWithSender);
+  });
+
+  // Handle user disconnection
+  socket.on("disconnect", () => {
+    console.log(`�� User disconnected: ${socket.id}`);
+    let userRoomId = null;
+
+    // Find the room the user was in and remove them
+    for (const roomId in rooms) {
+      if (rooms[roomId].users[socket.id]) {
+        userRoomId = roomId;
+        delete rooms[roomId].users[socket.id];
+
+        // If the room becomes empty, delete it
+        if (Object.keys(rooms[roomId].users).length === 0) {
+          delete rooms[roomId];
+          console.log(`🗑️ Room ${roomId} deleted as it is now empty.`);
+        }
+        break;
+      }
+    }
+
+    // If the user was in a room, notify other users in that room
+    if (userRoomId) {
+      socket.to(userRoomId).emit("user-left", socket.id);
+    }
+  });
+});
+
+// Start the server
+const PORT = process.env.PORT || 8000;
+server.listen(PORT, () => {
+  console.log(`🚀 Server is running on port ${PORT}`);
+});
