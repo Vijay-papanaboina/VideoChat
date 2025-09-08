@@ -7,6 +7,7 @@ import { Monitor } from "lucide-react";
 import { useWebRTC } from "../hooks/useWebRTC";
 import { useMediaControls } from "../hooks/useMediaControls";
 import { useScreenShare } from "../hooks/useScreenShare";
+import { useAuth } from "../contexts/AuthContext";
 
 // Import components
 import MediaControls from "../components/MediaControls";
@@ -21,6 +22,7 @@ const RoomPage = () => {
   const { roomId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
 
   // Refs for socket
   const socketRef = useRef(null);
@@ -57,6 +59,7 @@ const RoomPage = () => {
     remoteScreenSharing,
     stopScreenShare,
     startScreenShareWithType,
+    cleanup: cleanupScreenShare,
   } = useScreenShare(
     socketRef,
     roomId,
@@ -91,7 +94,12 @@ const RoomPage = () => {
     initializeLocalStream()
       .then(() => {
         // Emit 'join-room' event with user details
-        socketRef.current.emit("join-room", { roomId, password, username });
+        socketRef.current.emit("join-room", {
+          roomId,
+          password,
+          username,
+          userId: isAuthenticated() ? user.id : null,
+        });
 
         // Setup socket event listeners
         setupSocketListeners();
@@ -116,6 +124,7 @@ const RoomPage = () => {
     // Cleanup function on component unmount
     return () => {
       cleanup();
+      cleanupScreenShare();
       // Disconnect the socket
       if (socketRef.current) {
         socketRef.current.disconnect();
@@ -129,6 +138,9 @@ const RoomPage = () => {
     initializeLocalStream,
     setupSocketListeners,
     cleanup,
+    cleanupScreenShare,
+    isAuthenticated,
+    user?.id,
   ]);
 
   // Stream click handlers
@@ -144,6 +156,7 @@ const RoomPage = () => {
 
   const leaveRoom = () => {
     cleanup();
+    cleanupScreenShare();
     // Disconnect the socket
     if (socketRef.current) {
       socketRef.current.disconnect();

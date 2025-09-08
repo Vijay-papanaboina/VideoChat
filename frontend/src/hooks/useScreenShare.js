@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 /**
  * Custom hook for managing screen sharing functionality
@@ -124,13 +124,16 @@ export const useScreenShare = (
     }
   };
 
-  const stopScreenShare = () => {
+  const stopScreenShare = useCallback(() => {
     try {
       console.log("Stopping screen share");
 
       // Stop the screen stream
       if (screenStream) {
-        screenStream.getTracks().forEach((track) => track.stop());
+        screenStream.getTracks().forEach((track) => {
+          console.log("Stopping screen track:", track.kind);
+          track.stop();
+        });
         setScreenStream(null);
       }
 
@@ -158,7 +161,14 @@ export const useScreenShare = (
     } catch (error) {
       console.error("Error stopping screen share:", error);
     }
-  };
+  }, [
+    screenStream,
+    localStreamRef,
+    peerConnectionsRef,
+    socketRef,
+    roomId,
+    username,
+  ]);
 
   const toggleScreenShare = () => {
     if (isScreenSharing) {
@@ -175,6 +185,19 @@ export const useScreenShare = (
     startScreenShare(shareType);
   };
 
+  // Cleanup function
+  const cleanup = useCallback(() => {
+    console.log("Cleaning up screen share");
+    stopScreenShare();
+  }, [stopScreenShare]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cleanup();
+    };
+  }, [cleanup]);
+
   return {
     isScreenSharing,
     screenStream,
@@ -185,5 +208,6 @@ export const useScreenShare = (
     stopScreenShare,
     toggleScreenShare,
     startScreenShareWithType,
+    cleanup,
   };
 };

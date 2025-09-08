@@ -221,13 +221,20 @@ export const useWebRTC = (socketRef) => {
 
   // Cleanup function
   const cleanup = useCallback(() => {
+    console.log("Cleaning up WebRTC");
     // Stop all media tracks
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      localStreamRef.current.getTracks().forEach((track) => {
+        console.log("Stopping track:", track.kind, track.label);
+        track.stop();
+      });
     }
     // Close all peer connections
     const peerConnections = peerConnectionsRef.current;
-    Object.values(peerConnections).forEach((pc) => pc.close());
+    Object.values(peerConnections).forEach((pc) => {
+      console.log("Closing peer connection");
+      pc.close();
+    });
   }, []);
 
   return {

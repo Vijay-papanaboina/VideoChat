@@ -9,7 +9,7 @@ dotenv.config();
 // Import authentication routes and database
 import { router as authRoutes, authenticateToken } from "./routes/auth.js";
 import callHistoryRoutes from "./routes/callHistory.js";
-import { initializeDatabase } from "./src/init-db.js";
+import CallHistory from "./src/models/CallHistory.js";
 
 // Initialize Express app and HTTP server
 const app = express();
@@ -18,8 +18,8 @@ const server = http.createServer(app);
 // Configure Socket.IO with CORS
 const io = new SocketIOServer(server, {
   cors: {
-    origin: "*", // Allow all origins for development. Restrict in production.
-    methods: ["GET", "POST"],
+    origin: process.env.CORS_ORIGIN || "http://localhost:4000",
+    credentials: true,
   },
 });
 
@@ -30,7 +30,7 @@ app.use(express.urlencoded({ extended: true }));
 // Use CORS middleware for Express
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+    origin: process.env.CORS_ORIGIN || "http://localhost:4000",
     credentials: true,
   })
 );
@@ -56,8 +56,8 @@ io.on("connection", (socket) => {
   console.log(`�� User connected: ${socket.id}`);
 
   // Event listener for a user joining a room
-  socket.on("join-room", (data) => {
-    const { roomId, password, username } = data;
+  socket.on("join-room", async (data) => {
+    const { roomId, password, username, userId = null } = data;
 
     // --- Room Validation ---
     // If the room doesn't exist, create it with the provided password
@@ -92,16 +92,48 @@ io.on("connection", (socket) => {
 
     // --- Join Logic ---
     // Add the user to the room and join the socket to the room's channel
-    rooms[roomId].users[socket.id] = username;
+    rooms[roomId].users[socket.id] = { username, userId };
     socket.join(roomId);
     console.log(`�� User ${username} (${socket.id}) joined room: ${roomId}`);
 
+    // Check if there are any authenticated users in the room (including the new user)
+    const hasAuthenticatedUser = Object.values(rooms[roomId].users).some(
+      (user) => user.userId !== null
+    );
+
+    // Only track call history if there's at least one authenticated user
+    if (hasAuthenticatedUser) {
+      try {
+        const participantsCount = Object.keys(rooms[roomId].users).length;
+        await CallHistory.startCall(
+          roomId,
+          username,
+          userId,
+          participantsCount
+        );
+        console.log(
+          `📊 Call tracking started for room ${roomId} with ${participantsCount} participants`
+        );
+      } catch (error) {
+        console.error("Error starting call tracking:", error);
+      }
+    }
+
     // Get a list of all other users currently in the room with their usernames
+    // Safety check: ensure room still exists
+    if (!rooms[roomId] || !rooms[roomId].users) {
+      console.log(
+        `⚠️ Room ${roomId} no longer exists, user ${username} cannot join`
+      );
+      socket.emit("join-error", { message: "Room no longer exists." });
+      return;
+    }
+
     const otherUsers = Object.keys(rooms[roomId].users)
       .filter((id) => id !== socket.id)
       .map((id) => ({
         socketId: id,
-        username: rooms[roomId].users[id],
+        username: rooms[roomId].users[id].username,
       }));
 
     // Send the list of other users to the new user
@@ -183,21 +215,9 @@ io.on("connection", (socket) => {
 // Initialize database and start server
 const PORT = process.env.PORT || 8000;
 
-const startServer = async () => {
-  try {
-    // Initialize database
-    await initializeDatabase();
-
-    // Start the server
-    server.listen(PORT, () => {
-      console.log(`🚀 Server is running on port ${PORT}`);
-      console.log(`📊 Database connected and tables initialized`);
-      console.log(`🔐 Authentication endpoints available at /api/auth`);
-    });
-  } catch (error) {
-    console.error("❌ Failed to start server:", error);
-    process.exit(1);
-  }
-};
-
-startServer();
+// Start the server
+server.listen(PORT, () => {
+  console.log(`🚀 Server is running on port ${PORT}`);
+  console.log(`📊 Database connected`);
+  console.log(`🔐 Authentication endpoints available at /api/auth`);
+});

@@ -2,15 +2,12 @@ import {
   pgTable,
   serial,
   varchar,
-  text,
   boolean,
   integer,
   timestamp,
-  pgEnum,
 } from "drizzle-orm/pg-core";
 
 // Enums
-export const themeEnum = pgEnum("theme", ["light", "dark", "auto"]);
 
 // Users table
 export const users = pgTable("users", {
@@ -22,7 +19,6 @@ export const users = pgTable("users", {
   lastName: varchar("last_name", { length: 50 }),
   avatar: varchar("avatar", { length: 500 }),
   bio: varchar("bio", { length: 500 }),
-  theme: themeEnum("theme").default("auto"),
   emailNotifications: boolean("email_notifications").default(true),
   pushNotifications: boolean("push_notifications").default(true),
   totalCalls: integer("total_calls").default(0),
@@ -61,9 +57,8 @@ export const userSessions = pgTable("user_sessions", {
 export const callSessions = pgTable("call_sessions", {
   id: serial("id").primaryKey(),
   roomId: varchar("room_id", { length: 50 }).notNull(),
-  userId: integer("user_id")
-    .notNull()
-    .references(() => users.id),
+  userId: integer("user_id").references(() => users.id), // Allow null for guests
+  username: varchar("username", { length: 50 }).notNull(), // Store username for both users and guests
   duration: integer("duration").default(0), // in minutes
   startedAt: timestamp("started_at").defaultNow(),
   endedAt: timestamp("ended_at"),

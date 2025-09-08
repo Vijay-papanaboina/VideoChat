@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import CallHistory from "../callHistory/CallHistory";
 
-const UserProfile = ({ onClose }) => {
+const UserProfile = ({ isOpen, onClose }) => {
   const { user, updateProfile, changePassword, deleteAccount, logout } =
     useAuth();
   const [activeTab, setActiveTab] = useState("profile");
@@ -36,7 +36,6 @@ const UserProfile = ({ onClose }) => {
     firstName: user?.firstName || "",
     lastName: user?.lastName || "",
     bio: user?.bio || "",
-    theme: user?.theme || "auto",
     emailNotifications: user?.emailNotifications ?? true,
     pushNotifications: user?.pushNotifications ?? true,
   });
@@ -144,6 +143,8 @@ const UserProfile = ({ onClose }) => {
     onClose?.();
   };
 
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -238,22 +239,6 @@ const UserProfile = ({ onClose }) => {
                     placeholder="Tell us about yourself"
                     disabled={loading}
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="theme">Theme</Label>
-                  <select
-                    id="theme"
-                    name="theme"
-                    value={profileData.theme}
-                    onChange={handleProfileChange}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    disabled={loading}
-                  >
-                    <option value="auto">Auto</option>
-                    <option value="light">Light</option>
-                    <option value="dark">Dark</option>
-                  </select>
                 </div>
 
                 <div className="space-y-4">

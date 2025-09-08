@@ -13,7 +13,6 @@ class User {
     this.lastName = data.lastName;
     this.avatar = data.avatar;
     this.bio = data.bio;
-    this.theme = data.theme;
     this.emailNotifications = data.emailNotifications;
     this.pushNotifications = data.pushNotifications;
     this.totalCalls = data.totalCalls;
@@ -36,7 +35,6 @@ class User {
         lastName,
         avatar,
         bio,
-        theme = "auto",
         emailNotifications = true,
         pushNotifications = true,
       } = userData;
@@ -55,7 +53,6 @@ class User {
           lastName,
           avatar,
           bio,
-          theme,
           emailNotifications,
           pushNotifications,
         })
@@ -123,7 +120,6 @@ class User {
         "lastName",
         "avatar",
         "bio",
-        "theme",
         "emailNotifications",
         "pushNotifications",
       ];
@@ -224,7 +220,6 @@ class User {
       lastName: this.lastName,
       avatar: this.avatar,
       bio: this.bio,
-      theme: this.theme,
       emailNotifications: this.emailNotifications,
       pushNotifications: this.pushNotifications,
       totalCalls: this.totalCalls,

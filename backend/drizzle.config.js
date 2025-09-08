@@ -1,22 +1,23 @@
 import { defineConfig } from "drizzle-kit";
+import dotenv from "dotenv";
+dotenv.config();
+
+// Use the same connection logic as db.js
+const connectionString =
+  process.env.DATABASE_URL ||
+  `postgresql://${process.env.DB_USER || "postgres"}:${
+    process.env.DB_PASSWORD || "password"
+  }@${process.env.DB_HOST || "localhost"}:${process.env.DB_PORT || 5432}/${
+    process.env.DB_NAME || "videocallapp"
+  }`;
 
 export default defineConfig({
   schema: "./src/schema.js",
   out: "./drizzle",
   dialect: "postgresql",
-  dbCredentials: process.env.DATABASE_URL
-    ? {
-        connectionString: process.env.DATABASE_URL,
-      }
-    : {
-        host: process.env.DB_HOST || "localhost",
-        port: process.env.DB_PORT || 5432,
-        user: process.env.DB_USER || "postgres",
-        password: process.env.DB_PASSWORD || "password",
-        database: process.env.DB_NAME || "videocallapp",
-        ssl:
-          process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
-      },
+  dbCredentials: {
+    url: connectionString,
+  },
   verbose: true,
   strict: true,
 });

@@ -16,15 +16,21 @@ class CallHistory {
     this.connectionType = data.connectionType;
   }
 
-  // Start a new call session
-  static async startCall(userId, roomId, username, participantsCount = 1) {
+  // Start a new call session (supports both authenticated and guest users)
+  static async startCall(
+    roomId,
+    username,
+    userId = null,
+    participantsCount = 1
+  ) {
     try {
       // Create call session
       const [callSession] = await db
         .insert(callSessions)
         .values({
-          userId,
+          userId, // Can be null for guests
           roomId,
+          username,
           participantsCount,
           isActive: true,
         })
@@ -32,7 +38,7 @@ class CallHistory {
 
       // Add room participant
       await db.insert(roomParticipants).values({
-        userId,
+        userId, // Can be null for guests
         roomId,
         username,
         isActive: true,
@@ -44,10 +50,28 @@ class CallHistory {
     }
   }
 
-  // End a call session
-  static async endCall(userId, roomId, duration = 0, callQuality = 0) {
+  // End a call session (supports both authenticated and guest users)
+  static async endCall(
+    roomId,
+    username,
+    userId = null,
+    duration = 0,
+    callQuality = 0
+  ) {
     try {
       // Update call session
+      const whereCondition = userId
+        ? and(
+            eq(callSessions.userId, userId),
+            eq(callSessions.roomId, roomId),
+            eq(callSessions.isActive, true)
+          )
+        : and(
+            eq(callSessions.roomId, roomId),
+            eq(callSessions.username, username),
+            eq(callSessions.isActive, true)
+          );
+
       const [updatedSession] = await db
         .update(callSessions)
         .set({
@@ -56,29 +80,29 @@ class CallHistory {
           callQuality,
           isActive: false,
         })
-        .where(
-          and(
-            eq(callSessions.userId, userId),
-            eq(callSessions.roomId, roomId),
-            eq(callSessions.isActive, true)
-          )
-        )
+        .where(whereCondition)
         .returning();
 
       // Update room participant
+      const participantWhereCondition = userId
+        ? and(
+            eq(roomParticipants.userId, userId),
+            eq(roomParticipants.roomId, roomId),
+            eq(roomParticipants.isActive, true)
+          )
+        : and(
+            eq(roomParticipants.roomId, roomId),
+            eq(roomParticipants.username, username),
+            eq(roomParticipants.isActive, true)
+          );
+
       await db
         .update(roomParticipants)
         .set({
           leftAt: new Date(),
           isActive: false,
         })
-        .where(
-          and(
-            eq(roomParticipants.userId, userId),
-            eq(roomParticipants.roomId, roomId),
-            eq(roomParticipants.isActive, true)
-          )
-        );
+        .where(participantWhereCondition);
 
       return updatedSession ? new CallHistory(updatedSession) : null;
     } catch (error) {
@@ -97,7 +121,7 @@ class CallHistory {
         .limit(limit)
         .offset(offset);
 
-      return calls.map(call => new CallHistory(call));
+      return calls.map((call) => new CallHistory(call));
     } catch (error) {
       throw error;
     }
@@ -125,13 +149,15 @@ class CallHistory {
           )
         );
 
-      return stats[0] || {
-        totalCalls: 0,
-        totalDuration: 0,
-        avgDuration: 0,
-        avgQuality: 0,
-        totalParticipants: 0,
-      };
+      return (
+        stats[0] || {
+          totalCalls: 0,
+          totalDuration: 0,
+          avgDuration: 0,
+          avgQuality: 0,
+          totalParticipants: 0,
+        }
+      );
     } catch (error) {
       throw error;
     }
@@ -218,7 +244,7 @@ class CallHistory {
   static async getCallAnalytics(userId, period = "week") {
     try {
       let startDate = new Date();
-      
+
       switch (period) {
         case "day":
           startDate.setDate(startDate.getDate() - 1);
