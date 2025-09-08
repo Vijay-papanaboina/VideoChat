@@ -426,8 +426,8 @@ const RoomPage = () => {
   const getLayoutClasses = (remoteStreamCount, isFocused) => {
     if (isFocused) {
       // When focused, use responsive grid layout
-      // Desktop: 70/30 split, Mobile: vertical stack (portrait) or horizontal (landscape)
-      return "grid-cols-[70%_30%] grid-rows-1 md:grid-cols-[70%_30%] md:grid-rows-1 sm:grid-cols-1 sm:grid-rows-2";
+      // Desktop: 70/30 split, Mobile: vertical stack (focused on top, others below)
+      return "grid-cols-1 grid-rows-2 md:grid-cols-[70%_30%] md:grid-rows-1";
     } else {
       // Normal layout - responsive based on screen size
       switch (remoteStreamCount) {
@@ -603,7 +603,7 @@ const RoomPage = () => {
                 <>
                   {/* Focused stream - responsive sizing */}
                   <div
-                    className="relative w-full h-full cursor-pointer transition-all duration-300 ring-4 ring-blue-500 ring-opacity-75 md:col-span-1 md:row-span-1 sm:col-span-1 sm:row-span-1"
+                    className="relative w-full h-full cursor-pointer transition-all duration-300 ring-4 ring-blue-500 ring-opacity-75 md:col-span-1 md:row-span-1"
                     onClick={() =>
                       handleStreamClick(
                         focusedStream === "local" ? "local" : focusedStream
@@ -655,7 +655,7 @@ const RoomPage = () => {
                   </div>
 
                   {/* Other streams - responsive layout */}
-                  <div className="flex flex-col gap-2 h-full overflow-hidden md:flex-col sm:flex-col">
+                  <div className="flex flex-col gap-2 h-full overflow-hidden md:flex-col">
                     {otherStreams.map(
                       ({
                         socketId,
