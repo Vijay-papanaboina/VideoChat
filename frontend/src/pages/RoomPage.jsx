@@ -6,7 +6,14 @@ const ICE_SERVERS = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun3.l.google.com:19302" },
   ],
+  // Enhanced configuration for better quality
+  iceCandidatePoolSize: 10,
+  bundlePolicy: "max-bundle",
+  rtcpMuxPolicy: "require",
+  iceTransportPolicy: "all",
 };
 
 /**
@@ -38,6 +45,41 @@ const RoomPage = () => {
 
   // State for stream focusing
   const [focusedStream, setFocusedStream] = useState(null); // null = normal layout, "local" = local stream focused, socketId = remote stream focused
+
+  // Function to adjust video quality based on network conditions
+  const adjustVideoQuality = (stream, quality = "high") => {
+    if (!stream) return;
+
+    const videoTracks = stream.getVideoTracks();
+    videoTracks.forEach((track) => {
+      const settings = track.getSettings();
+      console.log("Current video settings:", settings);
+
+      // Apply quality constraints
+      const constraints = {
+        width:
+          quality === "high"
+            ? { ideal: 1920, max: 1920 }
+            : quality === "medium"
+            ? { ideal: 1280, max: 1280 }
+            : { ideal: 640, max: 640 },
+        height:
+          quality === "high"
+            ? { ideal: 1080, max: 1080 }
+            : quality === "medium"
+            ? { ideal: 720, max: 720 }
+            : { ideal: 480, max: 480 },
+        frameRate:
+          quality === "high"
+            ? { ideal: 30, max: 60 }
+            : quality === "medium"
+            ? { ideal: 24, max: 30 }
+            : { ideal: 15, max: 24 },
+      };
+
+      track.applyConstraints(constraints).catch(console.error);
+    });
+  };
 
   // Monitor remote streams to prevent unexpected clearing
   useEffect(() => {
@@ -90,13 +132,39 @@ const RoomPage = () => {
       import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
     socketRef.current = io(serverUrl);
 
-    // Get user's camera and microphone access
+    // Get user's camera and microphone access with high-quality constraints
+    const mediaConstraints = {
+      video: {
+        width: { ideal: 1920, max: 1920 },
+        height: { ideal: 1080, max: 1080 },
+        frameRate: { ideal: 30, max: 60 },
+        facingMode: "user",
+        // Prefer hardware acceleration
+        advanced: [
+          { width: { min: 1280 } },
+          { height: { min: 720 } },
+          { frameRate: { min: 24 } },
+          { aspectRatio: { exact: 16 / 9 } },
+        ],
+      },
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 48000,
+        channelCount: 2,
+      },
+    };
+
     navigator.mediaDevices
-      .getUserMedia({ video: true, audio: true })
+      .getUserMedia(mediaConstraints)
       .then((stream) => {
         console.log("Local stream obtained:", stream);
         localStreamRef.current = stream;
         setLocalStreamReady(true); // Set ready state immediately
+
+        // Apply high quality settings
+        adjustVideoQuality(stream, "high");
 
         // Emit 'join-room' event with user details
         socketRef.current.emit("join-room", { roomId, password, username });
@@ -198,6 +266,30 @@ const RoomPage = () => {
     );
     const pc = new RTCPeerConnection(ICE_SERVERS);
 
+    // Configure codec preferences for better quality
+    const transceivers = pc.getTransceivers();
+    if (transceivers.length > 0) {
+      // Prefer VP9 for better quality, fallback to VP8, then H.264
+      const codecPreferences = [
+        { mimeType: "video/VP9", clockRate: 90000 },
+        { mimeType: "video/VP8", clockRate: 90000 },
+        { mimeType: "video/H264", clockRate: 90000 },
+      ];
+
+      transceivers.forEach((transceiver) => {
+        if (
+          transceiver.sender &&
+          transceiver.sender.track &&
+          transceiver.sender.track.kind === "video"
+        ) {
+          const { setCodecPreferences } = transceiver;
+          if (setCodecPreferences) {
+            setCodecPreferences(codecPreferences);
+          }
+        }
+      });
+    }
+
     // Add connection state logging and monitoring
     pc.onconnectionstatechange = () => {
       console.log(
@@ -295,7 +387,12 @@ const RoomPage = () => {
       console.log(`Creating offer for ${targetSocketId}`);
       // Add a small delay to ensure the peer connection is fully set up
       setTimeout(() => {
-        pc.createOffer()
+        pc.createOffer({
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: true,
+          voiceActivityDetection: true,
+          iceRestart: false,
+        })
           .then((offer) => {
             console.log(`Setting local description for ${targetSocketId}`);
             return pc.setLocalDescription(offer);
@@ -332,7 +429,9 @@ const RoomPage = () => {
         console.log(
           `Set remote description for ${payload.caller}, creating answer`
         );
-        return pc.createAnswer();
+        return pc.createAnswer({
+          voiceActivityDetection: true,
+        });
       })
       .then((answer) => {
         console.log(
