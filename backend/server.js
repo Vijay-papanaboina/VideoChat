@@ -18,7 +18,10 @@ const io = socketIo(server, {
 });
 
 // Use CORS middleware for Express
-app.use(cors());
+app.use(cors({
+  origin: [process.env.FRONTEND_URL]||"http://localhost:4000",
+  credentials: true,
+}));
 
 // In-memory data stores for rooms and their users
 // rooms structure: { roomId: { password: "...", users: { socketId: "username", ... } } }

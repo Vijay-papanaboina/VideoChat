@@ -499,17 +499,6 @@ const RoomPage = () => {
         </div>
       )}
 
-      {/* Debug panel - only show in development */}
-      {/* {import.meta.env.DEV && (
-        <div className="absolute top-4 left-4 bg-black bg-opacity-75 text-white p-2 rounded text-xs z-10">
-          <div>Remote Streams: {remoteStreamsArray.length}</div>
-          <div>Layout: {gridClass}</div>
-          <div>
-            Connections: {Object.keys(peerConnectionsRef.current).length}
-          </div>
-          <div>Stream IDs: {Object.keys(remoteStreams).join(", ")}</div>
-        </div>
-      )} */}
 
       {/* Main grid for remote videos */}
       <div className={`grid w-full h-full gap-2 p-2 ${gridClass}`}>

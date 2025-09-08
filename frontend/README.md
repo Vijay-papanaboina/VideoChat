@@ -90,7 +90,7 @@ VideoCallApp/
    npm start
    ```
 
-   The server will run on `http://localhost:8000`
+   The server will run on the configured backend URL (default: `http://localhost:8000`)
 
 2. **Start the frontend development server**
 
@@ -160,11 +160,14 @@ Your own video appears in a smaller window in the bottom-right corner with a mir
 
 ### Environment Variables
 
-Create a `.env` file in the frontend directory:
+The frontend uses Vite environment variables to configure the backend URL. Create a `.env` file in the frontend directory:
 
 ```env
+# Backend URL configuration
 VITE_BACKEND_URL=http://localhost:8000
 ```
+
+**Note**: The application will fallback to `http://localhost:8000` if no environment variable is set.
 
 ### Backend Configuration
 
