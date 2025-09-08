@@ -36,6 +36,9 @@ const RoomPage = () => {
   const [promptUsername, setPromptUsername] = useState("");
   const [promptPassword, setPromptPassword] = useState("");
 
+  // State for stream focusing
+  const [focusedStream, setFocusedStream] = useState(null); // null = normal layout, "local" = local stream focused, socketId = remote stream focused
+
   // Monitor remote streams to prevent unexpected clearing
   useEffect(() => {
     console.log("Remote streams changed:", Object.keys(remoteStreams));
@@ -399,6 +402,17 @@ const RoomPage = () => {
     });
   };
 
+  // --- Stream Click Handlers ---
+  const handleStreamClick = (streamType, socketId = null) => {
+    if (focusedStream === (streamType === "local" ? "local" : socketId)) {
+      // If clicking the same stream, return to normal layout
+      setFocusedStream(null);
+    } else {
+      // Focus on the clicked stream
+      setFocusedStream(streamType === "local" ? "local" : socketId);
+    }
+  };
+
   // --- Dynamic Layout Calculation ---
   const remoteStreamsArray = Object.entries(remoteStreams)
     .filter(([, stream]) => stream && stream.active) // Only include active streams
@@ -408,25 +422,33 @@ const RoomPage = () => {
       username: remoteUsernames[socketId] || `User ${socketId.slice(-4)}`,
     }));
 
-  // Layout classes based on number of remote streams
-  const getLayoutClasses = (remoteStreamCount) => {
-    switch (remoteStreamCount) {
-      case 0:
-        return "grid-cols-1 grid-rows-1"; // Just local video - full screen
-      case 1:
-        return "grid-cols-1 grid-rows-1"; // 1 remote stream - full screen
-      case 2:
-        return "grid-cols-2 grid-rows-1"; // 2 remote streams - side by side
-      case 3:
-        return "grid-cols-2 grid-rows-2"; // 3 remote streams - 2x2 grid with 1 empty
-      case 4:
-        return "grid-cols-2 grid-rows-2"; // 4 remote streams - 2x2 grid full
-      default:
-        return "grid-cols-3 grid-rows-2"; // 5+ streams - 3x2 grid (fallback)
+  // Layout classes based on number of remote streams and focused state
+  const getLayoutClasses = (remoteStreamCount, isFocused) => {
+    if (isFocused) {
+      // When focused, use responsive grid layout
+      // Desktop: 70/30 split, Mobile: vertical stack (portrait) or horizontal (landscape)
+      return "grid-cols-[70%_30%] grid-rows-1 md:grid-cols-[70%_30%] md:grid-rows-1 sm:grid-cols-1 sm:grid-rows-2";
+    } else {
+      // Normal layout - responsive based on screen size
+      switch (remoteStreamCount) {
+        case 0:
+          return "grid-cols-1 grid-rows-1"; // Just local video - full screen
+        case 1:
+          return "grid-cols-1 grid-rows-1"; // 1 remote stream - full screen
+        case 2:
+          return "grid-cols-1 grid-rows-2 sm:grid-cols-2 sm:grid-rows-1"; // Mobile: vertical, Desktop: horizontal
+        case 3:
+          return "grid-cols-1 grid-rows-3 sm:grid-cols-2 sm:grid-rows-2"; // Mobile: vertical stack, Desktop: 2x2 grid
+        case 4:
+          return "grid-cols-1 grid-rows-4 sm:grid-cols-2 sm:grid-rows-2"; // Mobile: vertical stack, Desktop: 2x2 grid
+        default:
+          return "grid-cols-1 grid-rows-5 sm:grid-cols-3 sm:grid-rows-2"; // Mobile: vertical stack, Desktop: 3x2 grid
+      }
     }
   };
 
-  const gridClass = getLayoutClasses(remoteStreamsArray.length);
+  const isFocused = focusedStream !== null;
+  const gridClass = getLayoutClasses(remoteStreamsArray.length, isFocused);
 
   console.log("Remote streams count:", remoteStreamsArray.length);
   console.log("Remote streams:", remoteStreamsArray);
@@ -499,12 +521,18 @@ const RoomPage = () => {
         </div>
       )}
 
-
-      {/* Main grid for remote videos */}
+      {/* Main grid for videos */}
       <div className={`grid w-full h-full gap-2 p-2 ${gridClass}`}>
         {remoteStreamsArray.length === 0 ? (
           // Show local video full screen when no remote streams
-          <div className="relative w-full h-full">
+          <div
+            className={`relative w-full h-full cursor-pointer transition-all duration-300 ${
+              focusedStream === "local"
+                ? "ring-4 ring-blue-500 ring-opacity-75"
+                : ""
+            }`}
+            onClick={() => handleStreamClick("local")}
+          >
             <video
               key={
                 localStreamReady ? "local-video-ready" : "local-video-waiting"
@@ -541,45 +569,194 @@ const RoomPage = () => {
             <div className="absolute bottom-4 left-4 bg-black bg-opacity-70 text-white px-3 py-2 rounded text-lg font-medium">
               {username} (You)
             </div>
+            {/* Click to focus indicator */}
+            <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs sm:text-xs md:text-sm">
+              <span className="hidden sm:inline">Click to focus</span>
+              <span className="sm:hidden">Tap to focus</span>
+            </div>
           </div>
         ) : (
-          // Show remote streams
-          remoteStreamsArray.map(
-            ({ socketId, stream, username: remoteUsername }) => (
-              <div key={socketId} className="relative w-full h-full">
-                <video
-                  autoPlay
-                  playsInline
-                  ref={(video) => {
-                    if (video && stream) {
-                      video.srcObject = stream;
-                      console.log(`Set video srcObject for ${socketId}`);
+          // Show streams based on focus state
+          (() => {
+            if (isFocused) {
+              // When focused, show focused stream on left, others stacked vertically on right
+              const focusedStreamData =
+                focusedStream === "local"
+                  ? { type: "local", username: username }
+                  : remoteStreamsArray.find(
+                      (s) => s.socketId === focusedStream
+                    );
+
+              const otherStreams =
+                focusedStream === "local"
+                  ? remoteStreamsArray
+                  : [
+                      // Include local stream in the stack when remote stream is focused
+                      { type: "local", username: username, socketId: "local" },
+                      // Include other remote streams (excluding the focused one)
+                      ...remoteStreamsArray.filter(
+                        (s) => s.socketId !== focusedStream
+                      ),
+                    ];
+
+              return (
+                <>
+                  {/* Focused stream - responsive sizing */}
+                  <div
+                    className="relative w-full h-full cursor-pointer transition-all duration-300 ring-4 ring-blue-500 ring-opacity-75 md:col-span-1 md:row-span-1 sm:col-span-1 sm:row-span-1"
+                    onClick={() =>
+                      handleStreamClick(
+                        focusedStream === "local" ? "local" : focusedStream
+                      )
                     }
-                  }}
-                  className="w-full h-full object-cover rounded-lg"
-                  onLoadedMetadata={() => {
-                    console.log(`Video metadata loaded for ${socketId}`);
-                  }}
-                  onCanPlay={() => {
-                    console.log(`Video can play for ${socketId}`);
-                  }}
-                  onError={(e) => {
-                    console.error(`Video error for ${socketId}:`, e);
-                  }}
-                />
-                {/* Username overlay */}
-                <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-sm font-medium">
-                  {remoteUsername}
-                </div>
-              </div>
-            )
-          )
+                  >
+                    {focusedStream === "local" ? (
+                      // Local stream focused
+                      <>
+                        <video
+                          key="local-video-focused"
+                          autoPlay
+                          playsInline
+                          muted
+                          ref={(video) => {
+                            if (video && localStreamRef.current) {
+                              video.srcObject = localStreamRef.current;
+                            }
+                          }}
+                          className="w-full h-full object-cover rounded-lg border-2 border-white shadow-lg"
+                          style={{ transform: "scaleX(-1)" }}
+                        />
+                        <div className="absolute bottom-4 left-4 bg-black bg-opacity-70 text-white px-3 py-2 rounded text-lg font-medium">
+                          {username} (You) - FOCUSED
+                        </div>
+                      </>
+                    ) : (
+                      // Remote stream focused
+                      <>
+                        <video
+                          autoPlay
+                          playsInline
+                          ref={(video) => {
+                            if (video && focusedStreamData?.stream) {
+                              video.srcObject = focusedStreamData.stream;
+                            }
+                          }}
+                          className="w-full h-full object-cover rounded-lg border-2 border-white shadow-lg"
+                        />
+                        <div className="absolute bottom-4 left-4 bg-black bg-opacity-70 text-white px-3 py-2 rounded text-lg font-medium">
+                          {focusedStreamData?.username} - FOCUSED
+                        </div>
+                      </>
+                    )}
+                    <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs sm:text-xs md:text-sm">
+                      <span className="hidden sm:inline">Click to unfocus</span>
+                      <span className="sm:hidden">Tap to unfocus</span>
+                    </div>
+                  </div>
+
+                  {/* Other streams - responsive layout */}
+                  <div className="flex flex-col gap-2 h-full overflow-hidden md:flex-col sm:flex-col">
+                    {otherStreams.map(
+                      ({
+                        socketId,
+                        stream,
+                        username: remoteUsername,
+                        type,
+                      }) => (
+                        <div
+                          key={socketId}
+                          className="relative flex-1 min-h-0 cursor-pointer transition-all duration-300 hover:ring-2 hover:ring-blue-300 touch-manipulation active:ring-2 active:ring-blue-400"
+                          onClick={() =>
+                            handleStreamClick(
+                              type === "local" ? "local" : "remote",
+                              socketId
+                            )
+                          }
+                        >
+                          <video
+                            autoPlay
+                            playsInline
+                            muted={type === "local"}
+                            ref={(video) => {
+                              if (video) {
+                                if (
+                                  type === "local" &&
+                                  localStreamRef.current
+                                ) {
+                                  video.srcObject = localStreamRef.current;
+                                } else if (type !== "local" && stream) {
+                                  video.srcObject = stream;
+                                }
+                              }
+                            }}
+                            className="w-full h-full object-cover rounded-lg"
+                            style={
+                              type === "local"
+                                ? { transform: "scaleX(-1)" }
+                                : {}
+                            }
+                          />
+                          <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-sm font-medium">
+                            {remoteUsername} {type === "local" ? "(You)" : ""}
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                </>
+              );
+            } else {
+              // Normal layout - show all remote streams
+              return remoteStreamsArray.map(
+                ({ socketId, stream, username: remoteUsername }) => (
+                  <div
+                    key={socketId}
+                    className="relative w-full h-full cursor-pointer transition-all duration-300 hover:ring-2 hover:ring-blue-300 touch-manipulation active:ring-2 active:ring-blue-400"
+                    onClick={() => handleStreamClick("remote", socketId)}
+                  >
+                    <video
+                      autoPlay
+                      playsInline
+                      ref={(video) => {
+                        if (video && stream) {
+                          video.srcObject = stream;
+                          console.log(`Set video srcObject for ${socketId}`);
+                        }
+                      }}
+                      className="w-full h-full object-cover rounded-lg"
+                      onLoadedMetadata={() => {
+                        console.log(`Video metadata loaded for ${socketId}`);
+                      }}
+                      onCanPlay={() => {
+                        console.log(`Video can play for ${socketId}`);
+                      }}
+                      onError={(e) => {
+                        console.error(`Video error for ${socketId}:`, e);
+                      }}
+                    />
+                    {/* Username overlay */}
+                    <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-sm font-medium">
+                      {remoteUsername}
+                    </div>
+                    {/* Click to focus indicator */}
+                    <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-1 py-1 rounded text-xs sm:text-xs md:text-sm">
+                      <span className="hidden sm:inline">Click to focus</span>
+                      <span className="sm:hidden">Tap to focus</span>
+                    </div>
+                  </div>
+                )
+              );
+            }
+          })()
         )}
       </div>
 
-      {/* Local video in the corner (only show when there are remote streams) */}
-      {remoteStreamsArray.length > 0 && (
-        <div className="absolute bottom-4 right-4 w-48 h-36 md:w-64 md:h-48">
+      {/* Local video in the corner (only show when there are remote streams and not focused) */}
+      {remoteStreamsArray.length > 0 && !isFocused && (
+        <div
+          className="absolute bottom-4 right-4 w-32 h-24 sm:w-48 sm:h-36 md:w-64 md:h-48 cursor-pointer transition-all duration-300 hover:ring-2 hover:ring-blue-300 touch-manipulation"
+          onClick={() => handleStreamClick("local")}
+        >
           <div className="relative w-full h-full">
             <video
               key={
@@ -602,6 +779,11 @@ const RoomPage = () => {
             {/* Local username overlay */}
             <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-sm font-medium">
               {username} (You)
+            </div>
+            {/* Click to focus indicator */}
+            <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-1 py-1 rounded text-xs sm:text-xs md:text-sm">
+              <span className="hidden sm:inline">Click to focus</span>
+              <span className="sm:hidden">Tap to focus</span>
             </div>
           </div>
         </div>

@@ -18,15 +18,17 @@ const io = socketIo(server, {
 });
 
 // Use CORS middleware for Express
-app.use(cors({
-  origin: [process.env.FRONTEND_URL]||"http://localhost:4000",
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: [process.env.FRONTEND_URL] || "http://localhost:4000",
+    credentials: true,
+  })
+);
 
 // In-memory data stores for rooms and their users
 // rooms structure: { roomId: { password: "...", users: { socketId: "username", ... } } }
 const rooms = {};
-const MAX_USERS_PER_ROOM = 5;
+const MAX_USERS_PER_ROOM = 5; // Allow exactly 5 users (0-4 existing + 1 new = 5 total)
 
 // A simple root route for health checks
 app.get("/", (req, res) => {
@@ -60,10 +62,14 @@ io.on("connection", (socket) => {
 
     // Check if the room is already full
     const userCount = Object.keys(rooms[roomId].users).length;
+    console.log(
+      `📊 Room ${roomId} currently has ${userCount} users, max allowed: ${MAX_USERS_PER_ROOM}`
+    );
+
     if (userCount >= MAX_USERS_PER_ROOM) {
       socket.emit("room-full");
       console.log(
-        `🈵 Room ${roomId} is full. Connection rejected for ${socket.id}`
+        `🈵 Room ${roomId} is full (${userCount}/${MAX_USERS_PER_ROOM} users). Connection rejected for ${socket.id}`
       );
       return;
     }
