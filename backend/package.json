@@ -2,6 +2,7 @@
   "name": "videocall-backend",
   "version": "1.0.0",
   "description": "Backend server for VideoCall App with Socket.IO and WebRTC signaling",
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -18,9 +19,14 @@
   "author": "anonymous",
   "license": "MIT",
   "dependencies": {
+    "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
+    "drizzle-kit": "^0.31.4",
+    "drizzle-orm": "^0.44.5",
     "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "postgres": "^3.4.7",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {

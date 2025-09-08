@@ -1,29 +1,45 @@
 // Import required modules
-const express = require("express");
-const http = require("http");
-const socketIo = require("socket.io");
-const cors = require("cors");
-require("dotenv").config();
+import express from "express";
+import http from "http";
+import { Server as SocketIOServer } from "socket.io";
+import cors from "cors";
+import dotenv from "dotenv";
+dotenv.config();
+
+// Import authentication routes and database
+import { router as authRoutes, authenticateToken } from "./routes/auth.js";
+import callHistoryRoutes from "./routes/callHistory.js";
+import { initializeDatabase } from "./src/init-db.js";
 
 // Initialize Express app and HTTP server
 const app = express();
 const server = http.createServer(app);
 
 // Configure Socket.IO with CORS
-const io = socketIo(server, {
+const io = new SocketIOServer(server, {
   cors: {
     origin: "*", // Allow all origins for development. Restrict in production.
     methods: ["GET", "POST"],
   },
 });
 
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 // Use CORS middleware for Express
 app.use(
   cors({
-    origin: [process.env.FRONTEND_URL] || "http://localhost:4000",
+    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
     credentials: true,
   })
 );
+
+// Authentication routes
+app.use("/api/auth", authRoutes);
+
+// Call history routes
+app.use("/api/call-history", callHistoryRoutes);
 
 // In-memory data stores for rooms and their users
 // rooms structure: { roomId: { password: "...", users: { socketId: "username", ... } } }
@@ -164,8 +180,24 @@ io.on("connection", (socket) => {
   });
 });
 
-// Start the server
+// Initialize database and start server
 const PORT = process.env.PORT || 8000;
-server.listen(PORT, () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
-});
+
+const startServer = async () => {
+  try {
+    // Initialize database
+    await initializeDatabase();
+
+    // Start the server
+    server.listen(PORT, () => {
+      console.log(`🚀 Server is running on port ${PORT}`);
+      console.log(`📊 Database connected and tables initialized`);
+      console.log(`🔐 Authentication endpoints available at /api/auth`);
+    });
+  } catch (error) {
+    console.error("❌ Failed to start server:", error);
+    process.exit(1);
+  }
+};
+
+startServer();
