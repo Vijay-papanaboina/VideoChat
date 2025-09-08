@@ -1,0 +1,243 @@
+import { useRef, useState, useCallback } from "react";
+import { createPeerConnection, adjustVideoQuality } from "../utils/webrtc";
+
+/**
+ * Custom hook for managing WebRTC connections
+ */
+export const useWebRTC = (socketRef) => {
+  const localStreamRef = useRef(null);
+  const peerConnectionsRef = useRef({});
+  const [remoteStreams, setRemoteStreams] = useState({});
+  const [remoteUsernames, setRemoteUsernames] = useState({});
+  const [localStreamReady, setLocalStreamReady] = useState(false);
+
+  // Get user's camera and microphone access with high-quality constraints
+  const initializeLocalStream = useCallback(async () => {
+    const mediaConstraints = {
+      video: {
+        width: { ideal: 1920, max: 1920 },
+        height: { ideal: 1080, max: 1080 },
+        frameRate: { ideal: 30, max: 60 },
+        facingMode: "user",
+        // Prefer hardware acceleration
+        advanced: [
+          { width: { min: 1280 } },
+          { height: { min: 720 } },
+          { frameRate: { min: 24 } },
+          { aspectRatio: { exact: 16 / 9 } },
+        ],
+      },
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 48000,
+        channelCount: 2,
+      },
+    };
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(
+        mediaConstraints
+      );
+      console.log("Local stream obtained:", stream);
+      localStreamRef.current = stream;
+      setLocalStreamReady(true);
+
+      // Apply high quality settings
+      adjustVideoQuality(stream, "high");
+
+      return stream;
+    } catch (error) {
+      console.error("Error getting user media:", error);
+      throw error;
+    }
+  }, []);
+
+  // WebRTC Signaling Handlers
+  const handleOffer = useCallback(
+    (payload) => {
+      console.log(`Received offer from ${payload.caller}`);
+      const pc = peerConnectionsRef.current[payload.caller];
+      if (!pc) {
+        console.error(`No peer connection found for ${payload.caller}`);
+        return;
+      }
+
+      pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
+        .then(() => {
+          console.log(
+            `Set remote description for ${payload.caller}, creating answer`
+          );
+          return pc.createAnswer({
+            voiceActivityDetection: true,
+          });
+        })
+        .then((answer) => {
+          console.log(
+            `Created answer for ${payload.caller}, setting local description`
+          );
+          return pc.setLocalDescription(answer);
+        })
+        .then(() => {
+          console.log(`Sending answer to ${payload.caller}`);
+          socketRef.current.emit("answer", {
+            target: payload.caller,
+            callee: socketRef.current.id,
+            sdp: pc.localDescription,
+          });
+        })
+        .catch((error) => {
+          console.error(`Error handling offer from ${payload.caller}:`, error);
+        });
+    },
+    [socketRef]
+  );
+
+  const handleAnswer = useCallback((payload) => {
+    console.log(`Received answer from ${payload.callee}`);
+    const pc = peerConnectionsRef.current[payload.callee];
+    if (!pc) {
+      console.error(`No peer connection found for ${payload.callee}`);
+      return;
+    }
+
+    pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
+      .then(() => {
+        console.log(`Set remote description for answer from ${payload.callee}`);
+      })
+      .catch((error) => {
+        console.error(`Error handling answer from ${payload.callee}:`, error);
+      });
+  }, []);
+
+  const handleIceCandidate = useCallback((payload) => {
+    const pc = peerConnectionsRef.current[payload.sender];
+    if (pc && payload.candidate) {
+      pc.addIceCandidate(new RTCIceCandidate(payload.candidate)).catch(
+        (error) => {
+          console.error("Error adding ICE candidate:", error);
+        }
+      );
+    }
+  }, []);
+
+  const handleUserLeft = useCallback(
+    (socketId) => {
+      console.log("User left:", socketId);
+      // Close the peer connection
+      if (peerConnectionsRef.current[socketId]) {
+        peerConnectionsRef.current[socketId].close();
+        delete peerConnectionsRef.current[socketId];
+      }
+      // Remove the remote stream from state
+      setRemoteStreams((prev) => {
+        const newStreams = { ...prev };
+        delete newStreams[socketId];
+        return newStreams;
+      });
+      // Remove the username from state
+      setRemoteUsernames((prev) => {
+        const newUsernames = { ...prev };
+        delete newUsernames[socketId];
+        return newUsernames;
+      });
+    },
+    [setRemoteStreams, setRemoteUsernames]
+  );
+
+  // Setup socket event listeners
+  const setupSocketListeners = useCallback(() => {
+    if (!socketRef.current) return;
+
+    // Fired when the user successfully joins and receives a list of other users
+    socketRef.current.on("all-users", (otherUsers) => {
+      console.log("All other users in room:", otherUsers);
+      otherUsers.forEach((userData) => {
+        const socketId =
+          typeof userData === "string" ? userData : userData.socketId;
+        const username =
+          typeof userData === "string"
+            ? `User ${socketId.slice(-4)}`
+            : userData.username;
+
+        // Store the username for this socket ID
+        setRemoteUsernames((prev) => ({
+          ...prev,
+          [socketId]: username,
+        }));
+
+        // For each existing user, create a new peer connection
+        const pc = createPeerConnection(
+          socketId,
+          true,
+          localStreamRef,
+          socketRef,
+          setRemoteStreams
+        );
+        peerConnectionsRef.current[socketId] = pc;
+      });
+    });
+
+    // Fired when a new user joins the room
+    socketRef.current.on("user-joined", (payload) => {
+      console.log("New user joined:", payload);
+      // Store the username for this socket ID
+      setRemoteUsernames((prev) => ({
+        ...prev,
+        [payload.socketId]: payload.username,
+      }));
+      // Create a peer connection for the new user (but don't initiate the call)
+      const pc = createPeerConnection(
+        payload.socketId,
+        false,
+        localStreamRef,
+        socketRef,
+        setRemoteStreams
+      );
+      peerConnectionsRef.current[payload.socketId] = pc;
+
+      // The new user will initiate the connection, so we wait for their offer
+    });
+
+    // Fired when receiving a WebRTC offer from another peer
+    socketRef.current.on("offer", handleOffer);
+
+    // Fired when receiving a WebRTC answer from another peer
+    socketRef.current.on("answer", handleAnswer);
+
+    // Fired when receiving an ICE candidate from another peer
+    socketRef.current.on("ice-candidate", handleIceCandidate);
+
+    // Fired when a user leaves the room
+    socketRef.current.on("user-left", handleUserLeft);
+  }, [
+    handleOffer,
+    handleAnswer,
+    handleIceCandidate,
+    handleUserLeft,
+    socketRef,
+  ]);
+
+  // Cleanup function
+  const cleanup = useCallback(() => {
+    // Stop all media tracks
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => track.stop());
+    }
+    // Close all peer connections
+    const peerConnections = peerConnectionsRef.current;
+    Object.values(peerConnections).forEach((pc) => pc.close());
+  }, []);
+
+  return {
+    localStreamRef,
+    peerConnectionsRef,
+    remoteStreams,
+    remoteUsernames,
+    localStreamReady,
+    initializeLocalStream,
+    setupSocketListeners,
+    cleanup,
+  };
+};

@@ -115,6 +115,28 @@ io.on("connection", (socket) => {
     io.to(payload.target).emit("ice-candidate", payloadWithSender);
   });
 
+  // Handle screen sharing events
+  socket.on("screen-share-started", (data) => {
+    console.log(
+      `📺 ${data.username} started screen sharing in room ${data.roomId}`
+    );
+    socket.to(data.roomId).emit("user-screen-sharing", {
+      username: data.username,
+      shareType: data.shareType,
+      isSharing: true,
+    });
+  });
+
+  socket.on("screen-share-stopped", (data) => {
+    console.log(
+      `📺 ${data.username} stopped screen sharing in room ${data.roomId}`
+    );
+    socket.to(data.roomId).emit("user-screen-sharing", {
+      username: data.username,
+      isSharing: false,
+    });
+  });
+
   // Handle user disconnection
   socket.on("disconnect", () => {
     console.log(`�� User disconnected: ${socket.id}`);
