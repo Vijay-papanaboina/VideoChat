@@ -46,6 +46,10 @@ const RoomPage = () => {
   // State for stream focusing
   const [focusedStream, setFocusedStream] = useState(null); // null = normal layout, "local" = local stream focused, socketId = remote stream focused
 
+  // State for media controls
+  const [isAudioMuted, setIsAudioMuted] = useState(false);
+  const [isVideoMuted, setIsVideoMuted] = useState(false);
+
   // Function to adjust video quality based on network conditions
   const adjustVideoQuality = (stream, quality = "high") => {
     if (!stream) return;
@@ -512,6 +516,43 @@ const RoomPage = () => {
     }
   };
 
+  // --- Media Control Handlers ---
+  const toggleAudio = () => {
+    if (localStreamRef.current) {
+      const audioTracks = localStreamRef.current.getAudioTracks();
+      audioTracks.forEach((track) => {
+        track.enabled = isAudioMuted;
+      });
+      setIsAudioMuted(!isAudioMuted);
+    }
+  };
+
+  const toggleVideo = () => {
+    if (localStreamRef.current) {
+      const videoTracks = localStreamRef.current.getVideoTracks();
+      videoTracks.forEach((track) => {
+        track.enabled = isVideoMuted;
+      });
+      setIsVideoMuted(!isVideoMuted);
+    }
+  };
+
+  const leaveRoom = () => {
+    // Stop all media tracks
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => track.stop());
+    }
+    // Close all peer connections
+    const peerConnections = peerConnectionsRef.current;
+    Object.values(peerConnections).forEach((pc) => pc.close());
+    // Disconnect the socket
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+    }
+    // Navigate back to home
+    navigate("/");
+  };
+
   // --- Dynamic Layout Calculation ---
   const remoteStreamsArray = Object.entries(remoteStreams)
     .filter(([, stream]) => stream && stream.active) // Only include active streams
@@ -620,6 +661,64 @@ const RoomPage = () => {
         </div>
       )}
 
+      {/* Media Control Bar */}
+      <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">
+        <div className="flex items-center gap-3 bg-black bg-opacity-80 backdrop-blur-sm rounded-full px-6 py-4 shadow-2xl border border-gray-600">
+          {/* Audio Toggle Button */}
+          <button
+            onClick={toggleAudio}
+            className={`p-3 rounded-full transition-all duration-200 ${
+              isAudioMuted
+                ? "bg-red-600 hover:bg-red-700 text-white"
+                : "bg-gray-600 hover:bg-gray-700 text-white"
+            }`}
+            aria-label={isAudioMuted ? "Unmute audio" : "Mute audio"}
+          >
+            {isAudioMuted ? (
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+              </svg>
+            )}
+          </button>
+
+          {/* Video Toggle Button */}
+          <button
+            onClick={toggleVideo}
+            className={`p-3 rounded-full transition-all duration-200 ${
+              isVideoMuted
+                ? "bg-red-600 hover:bg-red-700 text-white"
+                : "bg-gray-600 hover:bg-gray-700 text-white"
+            }`}
+            aria-label={isVideoMuted ? "Turn on video" : "Turn off video"}
+          >
+            {isVideoMuted ? (
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M21 6.5l-4 4V7c0-.55-.45-1-1-1H9.82L21 17.18V6.5zM3.27 2L2 3.27 4.73 6H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.21 0 .39-.08.55-.18L19.73 21 21 19.73 3.27 2zM5 16V8h1.73l8 8H5z" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" />
+              </svg>
+            )}
+          </button>
+
+          {/* Leave Room Button */}
+          <button
+            onClick={leaveRoom}
+            className="p-3 rounded-full bg-red-600 hover:bg-red-700 text-white transition-all duration-200"
+            aria-label="Leave room"
+          >
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12.79 5.37c-.39-.39-1.02-.39-1.41 0L8.79 7.37c-.39.39-.39 1.02 0 1.41L10.38 10.5H4c-.55 0-1 .45-1 1s.45 1 1 1h6.38l-1.59 1.72c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0l2.59-2.59c.39-.39.39-1.02 0-1.41L12.79 5.37zM19 3H5c-1.1 0-2 .9-2 2v3c0 .55.45 1 1 1s1-.45 1-1V5h14v14H5v-2c0-.55-.45-1-1-1s-1 .45-1 1v3c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
       {/* Main grid for videos */}
       <div className={`grid w-full h-full gap-2 p-2 ${gridClass}`}>
         {remoteStreamsArray.length === 0 ? (
@@ -668,6 +767,31 @@ const RoomPage = () => {
             <div className="absolute bottom-4 left-4 bg-black bg-opacity-70 text-white px-3 py-2 rounded text-lg font-medium">
               {username} (You)
             </div>
+            {/* Mute indicators */}
+            {isAudioMuted && (
+              <div className="absolute top-4 left-4 bg-red-600 text-white px-2 py-1 rounded-full text-sm font-medium flex items-center gap-1">
+                <svg
+                  className="w-4 h-4"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
+                </svg>
+                Muted
+              </div>
+            )}
+            {isVideoMuted && (
+              <div className="absolute top-4 right-4 bg-red-600 text-white px-2 py-1 rounded-full text-sm font-medium flex items-center gap-1">
+                <svg
+                  className="w-4 h-4"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M21 6.5l-4 4V7c0-.55-.45-1-1-1H9.82L21 17.18V6.5zM3.27 2L2 3.27 4.73 6H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.21 0 .39-.08.55-.18L19.73 21 21 19.73 3.27 2zM5 16V8h1.73l8 8H5z" />
+                </svg>
+                Camera Off
+              </div>
+            )}
             {/* Click to focus indicator */}
             <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs sm:text-xs md:text-sm">
               <span className="hidden sm:inline">Click to focus</span>
