@@ -18,9 +18,7 @@ import {
   Phone,
   Settings,
   X,
-  BarChart3,
 } from "lucide-react";
-import CallHistory from "../callHistory/CallHistory";
 
 const UserProfile = ({ isOpen, onClose }) => {
   const { user } = useAuthState();
@@ -29,7 +27,6 @@ const UserProfile = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [showCallHistory, setShowCallHistory] = useState(false);
 
   // Profile form data
   const [profileData, setProfileData] = useState({
@@ -161,14 +158,6 @@ const UserProfile = ({ isOpen, onClose }) => {
               >
                 <Settings className="w-4 h-4 mr-2" />
                 Security
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowCallHistory(true)}
-                className="flex-1"
-              >
-                <BarChart3 className="w-4 h-4 mr-2" />
-                Call History
               </Button>
             </div>
 
@@ -359,11 +348,6 @@ const UserProfile = ({ isOpen, onClose }) => {
           </CardContent>
         </Card>
       </div>
-
-      {/* Call History Modal */}
-      {showCallHistory && (
-        <CallHistory onClose={() => setShowCallHistory(false)} />
-      )}
     </div>
   );
 };

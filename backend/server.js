@@ -6,10 +6,15 @@ import cors from "cors";
 import dotenv from "dotenv";
 dotenv.config();
 
-// Import authentication routes and database
-import { router as authRoutes, authenticateToken } from "./routes/auth.js";
-import callHistoryRoutes from "./routes/callHistory.js";
-import CallHistory from "./src/models/CallHistory.js";
+// Import routes
+import { router as authRoutes } from "./routes/auth.js";
+import chatRoutes from "./routes/chat.js";
+
+// Import services for WebSocket integration
+import { ChatService } from "./src/services/chatService.js";
+
+// Import middleware
+import { errorHandler, notFound } from "./src/middleware/errorHandler.js";
 
 // Initialize Express app and HTTP server
 const app = express();
@@ -35,13 +40,9 @@ app.use(
   })
 );
 
-// Authentication routes
+// Routes
 app.use("/api/auth", authRoutes);
-
-// Call history routes
-app.use("/api/call-history", callHistoryRoutes);
-
-// No chat routes - pure WebSocket messaging only
+app.use("/api/chat", chatRoutes);
 
 // In-memory data stores for rooms and their users
 // rooms structure: { roomId: { password: "...", users: { socketId: "username", ... } } }
@@ -55,7 +56,7 @@ app.get("/", (req, res) => {
 
 // Handle new socket connections
 io.on("connection", (socket) => {
-  console.log(`�� User connected: ${socket.id}`);
+  console.log(`👤 User connected: ${socket.id}`);
 
   // Event listener for a user joining a room
   socket.on("join-room", async (data) => {
@@ -103,30 +104,7 @@ io.on("connection", (socket) => {
     // Add the user to the room and join the socket to the room's channel
     rooms[roomId].users[socket.id] = { username, userId };
     socket.join(roomId);
-    console.log(`�� User ${username} (${socket.id}) joined room: ${roomId}`);
-
-    // Check if there are any authenticated users in the room (including the new user)
-    const hasAuthenticatedUser = Object.values(rooms[roomId].users).some(
-      (user) => user.userId !== null
-    );
-
-    // Only track call history if there's at least one authenticated user
-    if (hasAuthenticatedUser) {
-      try {
-        const participantsCount = Object.keys(rooms[roomId].users).length;
-        await CallHistory.startCall(
-          roomId,
-          username,
-          userId,
-          participantsCount
-        );
-        console.log(
-          `📊 Call tracking started for room ${roomId} with ${participantsCount} participants`
-        );
-      } catch (error) {
-        console.error("Error starting call tracking:", error);
-      }
-    }
+    console.log(`👤 User ${username} (${socket.id}) joined room: ${roomId}`);
 
     // Get a list of all other users currently in the room with their usernames
     // Safety check: ensure room still exists
@@ -147,11 +125,6 @@ io.on("connection", (socket) => {
 
     // Send the list of other users to the new user
     socket.emit("all-users", otherUsers);
-
-    // No chat history loading - pure real-time messaging only
-    console.log(
-      `💬 User ${username} joined room ${roomId} - real-time chat enabled`
-    );
 
     // Notify all other users in the room that a new user has joined
     socket.to(roomId).emit("user-joined", { socketId: socket.id, username });
@@ -243,7 +216,7 @@ io.on("connection", (socket) => {
 
   // Handle user disconnection
   socket.on("disconnect", async () => {
-    console.log(`�� User disconnected: ${socket.id}`);
+    console.log(`👤 User disconnected: ${socket.id}`);
     let userRoomId = null;
 
     // Find the room the user was in and remove them
@@ -274,6 +247,10 @@ io.on("connection", (socket) => {
   });
 });
 
+// Error handling middleware
+app.use(notFound);
+app.use(errorHandler);
+
 // Initialize database and start server
 const PORT = process.env.PORT || 8000;
 
@@ -282,4 +259,5 @@ server.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`📊 Database connected`);
   console.log(`🔐 Authentication endpoints available at /api/auth`);
+  console.log(`💬 Chat endpoints available at /api/chat`);
 });

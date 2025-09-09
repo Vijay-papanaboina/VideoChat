@@ -54,21 +54,6 @@ export const userSessions = pgTable("user_sessions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Call sessions table (for tracking call statistics)
-export const callSessions = pgTable("call_sessions", {
-  id: serial("id").primaryKey(),
-  roomId: varchar("room_id", { length: 50 }).notNull(),
-  userId: integer("user_id").references(() => users.id), // Allow null for guests
-  username: varchar("username", { length: 50 }).notNull(), // Store username for both users and guests
-  duration: integer("duration").default(0), // in minutes
-  startedAt: timestamp("started_at").defaultNow(),
-  endedAt: timestamp("ended_at"),
-  isActive: boolean("is_active").default(true),
-  callQuality: integer("call_quality").default(0), // 1-5 rating
-  participantsCount: integer("participants_count").default(1),
-  connectionType: varchar("connection_type", { length: 20 }).default("webrtc"), // webrtc, fallback
-});
-
 // Room participants table (for tracking who joined which rooms)
 export const roomParticipants = pgTable("room_participants", {
   id: serial("id").primaryKey(),
@@ -98,14 +83,18 @@ export const userFavorites = pgTable("user_favorites", {
 export const chatMessages = pgTable("chat_messages", {
   id: serial("id").primaryKey(),
   roomId: varchar("room_id", { length: 50 }).notNull(),
-  username: varchar("username", { length: 50 }).notNull(),
   userId: integer("user_id").references(() => users.id, {
     onDelete: "set null",
   }), // Allow null for guests
+  username: varchar("username", { length: 50 }).notNull(),
   message: text("message").notNull(),
-  messageType: varchar("message_type", { length: 20 }).default("text"), // text, emoji, system
+  messageType: varchar("message_type", { length: 20 }).default("text"), // text, image, file, system
   timestamp: timestamp("timestamp").defaultNow(),
+  isEdited: boolean("is_edited").default(false),
+  editedAt: timestamp("edited_at"),
   isDeleted: boolean("is_deleted").default(false),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Room chat sessions table (tracks active chat sessions)

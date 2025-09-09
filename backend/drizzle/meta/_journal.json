@@ -22,6 +22,13 @@
       "when": 1757391945952,
       "tag": "0002_far_wolfsbane",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1757415835346,
+      "tag": "0003_jittery_agent_zero",
+      "breakpoints": true
     }
   ]
 }
