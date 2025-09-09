@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ModeToggle } from "@/components/mode-toggle";
+import { ModeToggle } from "@/components/ui/mode-toggle";
 import AuthModal from "../components/auth/AuthModal";
 import UserProfile from "../components/auth/UserProfile";
 import { User, LogOut } from "lucide-react";
