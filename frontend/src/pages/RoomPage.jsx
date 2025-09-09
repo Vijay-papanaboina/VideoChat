@@ -57,15 +57,15 @@ const RoomPage = () => {
     isScreenShareSupported,
     screenShareType,
     remoteScreenSharing,
-    stopScreenShare,
-    startScreenShareWithType,
+    toggleScreenShare,
     cleanup: cleanupScreenShare,
   } = useScreenShare(
     socketRef,
     roomId,
     username,
     peerConnectionsRef,
-    localStreamRef
+    localStreamRef,
+    isVideoMuted
   );
 
   // Check if credentials are missing and show prompt
@@ -224,8 +224,7 @@ const RoomPage = () => {
         isScreenShareSupported={isScreenShareSupported}
         onToggleAudio={toggleAudio}
         onToggleVideo={toggleVideo}
-        onStartScreenShareWithType={startScreenShareWithType}
-        onStopScreenShare={stopScreenShare}
+        onToggleScreenShare={toggleScreenShare}
         onLeaveRoom={leaveRoom}
       />
 

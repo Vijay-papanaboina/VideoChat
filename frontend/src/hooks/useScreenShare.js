@@ -13,13 +13,27 @@ export const useScreenShare = (
   roomId,
   username,
   peerConnectionsRef,
-  localStreamRef
+  localStreamRef,
+  isVideoMuted = false
 ) => {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [screenStream, setScreenStream] = useState(null);
   const [screenShareType, setScreenShareType] = useState(null);
   const [isScreenShareSupported, setIsScreenShareSupported] = useState(false);
   const [remoteScreenSharing, setRemoteScreenSharing] = useState({});
+
+  // Create a blank video track for when video is muted
+  const createBlankVideoTrack = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1920;
+    canvas.height = 1080;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const stream = canvas.captureStream(30);
+    return stream.getVideoTracks()[0];
+  };
 
   // Check screen sharing support
   useEffect(() => {
@@ -58,19 +72,13 @@ export const useScreenShare = (
     };
   }, [socketRef]);
 
-  const startScreenShare = async (shareType = "screen") => {
+  const startScreenShare = async () => {
     try {
-      console.log(`Starting screen share: ${shareType}`);
+      console.log("Starting screen share");
 
-      // Different constraints based on share type
+      // Let browser handle the selection, just provide basic constraints
       const constraints = {
         video: {
-          displaySurface:
-            shareType === "screen"
-              ? "monitor"
-              : shareType === "window"
-              ? "window"
-              : "browser",
           cursor: "always", // Show cursor
           width: { ideal: 1920, max: 1920 },
           height: { ideal: 1080, max: 1080 },
@@ -88,20 +96,25 @@ export const useScreenShare = (
       // Store the screen stream
       setScreenStream(stream);
       setIsScreenSharing(true);
-      setScreenShareType(shareType);
+      setScreenShareType("screen"); // Default to "screen" since browser handles selection
 
       console.log("Screen sharing started:", stream);
 
       // Replace video track in all peer connections
       const videoTrack = stream.getVideoTracks()[0];
       if (videoTrack) {
+        // If video is muted, create a blank video track
+        const trackToSend = isVideoMuted ? createBlankVideoTrack() : videoTrack;
+
         Object.values(peerConnectionsRef.current).forEach((pc) => {
           const sender = pc
             .getSenders()
             .find((s) => s.track && s.track.kind === "video");
           if (sender) {
-            sender.replaceTrack(videoTrack);
-            console.log("Replaced video track in peer connection");
+            sender.replaceTrack(trackToSend);
+            console.log(
+              `Replaced video track in peer connection (muted: ${isVideoMuted})`
+            );
           }
         });
       }
@@ -115,7 +128,7 @@ export const useScreenShare = (
       // Notify other users about screen sharing
       socketRef.current.emit("screen-share-started", {
         roomId,
-        shareType,
+        shareType: "screen", // Default to "screen" since browser handles selection
         username,
       });
     } catch (error) {
@@ -174,16 +187,36 @@ export const useScreenShare = (
     if (isScreenSharing) {
       stopScreenShare();
     } else {
-      startScreenShare("screen");
+      startScreenShare();
     }
   };
 
-  const startScreenShareWithType = (shareType) => {
-    if (isScreenSharing) {
-      stopScreenShare();
+  // Handle video mute changes during screen sharing
+  const handleVideoMuteChange = useCallback(() => {
+    if (isScreenSharing && screenStream) {
+      const videoTrack = screenStream.getVideoTracks()[0];
+      if (videoTrack) {
+        const trackToSend = isVideoMuted ? createBlankVideoTrack() : videoTrack;
+
+        Object.values(peerConnectionsRef.current).forEach((pc) => {
+          const sender = pc
+            .getSenders()
+            .find((s) => s.track && s.track.kind === "video");
+          if (sender) {
+            sender.replaceTrack(trackToSend);
+            console.log(
+              `Updated video track for screen share (muted: ${isVideoMuted})`
+            );
+          }
+        });
+      }
     }
-    startScreenShare(shareType);
-  };
+  }, [isScreenSharing, screenStream, isVideoMuted, peerConnectionsRef]);
+
+  // Watch for video mute changes during screen sharing
+  useEffect(() => {
+    handleVideoMuteChange();
+  }, [handleVideoMuteChange]);
 
   // Cleanup function
   const cleanup = useCallback(() => {
@@ -207,7 +240,6 @@ export const useScreenShare = (
     startScreenShare,
     stopScreenShare,
     toggleScreenShare,
-    startScreenShareWithType,
     cleanup,
   };
 };

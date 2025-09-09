@@ -1,20 +1,10 @@
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Mic,
   MicOff,
   Video,
   VideoOff,
   Monitor,
   MonitorOff,
-  X,
-  Square,
-  RectangleHorizontal,
-  Layout,
   PhoneOff,
 } from "lucide-react";
 
@@ -29,8 +19,7 @@ const MediaControls = ({
   isScreenShareSupported,
   onToggleAudio,
   onToggleVideo,
-  onStartScreenShareWithType,
-  onStopScreenShare,
+  onToggleScreenShare,
   onLeaveRoom,
 }) => {
   return (
@@ -72,63 +61,23 @@ const MediaControls = ({
 
         {/* Screen Share Button */}
         {isScreenShareSupported && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className={`p-3 rounded-full transition-all duration-200 ${
-                  isScreenSharing
-                    ? "bg-green-600 hover:bg-green-700 text-white"
-                    : "bg-gray-600 hover:bg-gray-700 text-white"
-                }`}
-                aria-label={
-                  isScreenSharing
-                    ? "Stop screen sharing"
-                    : "Start screen sharing"
-                }
-              >
-                {isScreenSharing ? (
-                  <MonitorOff className="w-5 h-5" />
-                ) : (
-                  <Monitor className="w-5 h-5" />
-                )}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56">
-              {isScreenSharing ? (
-                <DropdownMenuItem
-                  onClick={onStopScreenShare}
-                  className="cursor-pointer"
-                >
-                  <X className="w-4 h-4 mr-2" />
-                  Stop Screen Sharing
-                </DropdownMenuItem>
-              ) : (
-                <>
-                  <DropdownMenuItem
-                    onClick={() => onStartScreenShareWithType("screen")}
-                    className="cursor-pointer"
-                  >
-                    <Monitor className="w-4 h-4 mr-2" />
-                    Share Entire Screen
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => onStartScreenShareWithType("window")}
-                    className="cursor-pointer"
-                  >
-                    <RectangleHorizontal className="w-4 h-4 mr-2" />
-                    Share Application Window
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => onStartScreenShareWithType("tab")}
-                    className="cursor-pointer"
-                  >
-                    <Layout className="w-4 h-4 mr-2" />
-                    Share Browser Tab
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <button
+            onClick={onToggleScreenShare}
+            className={`p-3 rounded-full transition-all duration-200 ${
+              isScreenSharing
+                ? "bg-green-600 hover:bg-green-700 text-white"
+                : "bg-gray-600 hover:bg-gray-700 text-white"
+            }`}
+            aria-label={
+              isScreenSharing ? "Stop screen sharing" : "Start screen sharing"
+            }
+          >
+            {isScreenSharing ? (
+              <MonitorOff className="w-5 h-5" />
+            ) : (
+              <Monitor className="w-5 h-5" />
+            )}
+          </button>
         )}
 
         {/* Leave Room Button */}
