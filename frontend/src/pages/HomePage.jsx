@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuthState, useAuthActions } from "../stores/authStore";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -24,7 +24,8 @@ import { User, LogOut } from "lucide-react";
  */
 const HomePage = () => {
   const navigate = useNavigate();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated } = useAuthState();
+  const { logout } = useAuthActions();
   const [roomId, setRoomId] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
@@ -34,7 +35,7 @@ const HomePage = () => {
   // Handles the form submission
   const handleJoinRoom = (e) => {
     e.preventDefault();
-    const displayUsername = isAuthenticated() ? user.username : username;
+    const displayUsername = isAuthenticated ? user.username : username;
 
     if (roomId.trim() && password.trim() && displayUsername.trim()) {
       // Navigate to the room page, passing user details in the state
@@ -58,7 +59,7 @@ const HomePage = () => {
           <h1 className="text-xl font-bold">VideoCallApp</h1>
         </div>
         <div className="flex items-center space-x-2">
-          {isAuthenticated() ? (
+          {isAuthenticated ? (
             <>
               <span className="text-sm text-muted-foreground">
                 Welcome, {user.firstName || user.username}
@@ -100,7 +101,7 @@ const HomePage = () => {
           </CardHeader>
           <form onSubmit={handleJoinRoom}>
             <CardContent className="grid gap-4">
-              {!isAuthenticated() && (
+              {!isAuthenticated && (
                 <div className="grid gap-2">
                   <Label
                     htmlFor="username"
@@ -119,7 +120,7 @@ const HomePage = () => {
                   />
                 </div>
               )}
-              {isAuthenticated() && (
+              {isAuthenticated && (
                 <div className="p-3 bg-muted rounded-md">
                   <p className="text-sm text-muted-foreground">
                     Joining as:{" "}
@@ -180,7 +181,7 @@ const HomePage = () => {
         }}
       />
 
-      {isAuthenticated() && (
+      {isAuthenticated && (
         <UserProfile
           isOpen={showUserProfile}
           onClose={() => setShowUserProfile(false)}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useAuth } from "../../contexts/AuthContext";
+import { useAuthState } from "../../stores/authStore";
 import { Button } from "../ui/button";
 import {
   Card,
@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 
 const CallHistory = ({ onClose }) => {
-  const { user } = useAuth();
+  const { user } = useAuthState();
   const [activeTab, setActiveTab] = useState("history");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");

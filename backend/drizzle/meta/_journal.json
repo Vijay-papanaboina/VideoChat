@@ -15,6 +15,13 @@
       "when": 1757338237871,
       "tag": "0001_boring_forge",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1757391945952,
+      "tag": "0002_far_wolfsbane",
+      "breakpoints": true
     }
   ]
 }

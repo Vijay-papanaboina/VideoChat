@@ -36,27 +36,14 @@ const VideoGrid = ({
             playsInline
             muted
             ref={(video) => {
-              console.log(
-                "Video ref called, video:",
-                video,
-                "localStream:",
-                localStreamRef.current,
-                "ready:",
-                localStreamReady
-              );
               if (video && localStreamRef.current) {
                 video.srcObject = localStreamRef.current;
-                console.log("Set local video srcObject (full screen)");
-              } else {
-                console.log(
-                  "Cannot set video srcObject - missing video element or stream"
-                );
               }
             }}
             className="w-full h-full object-cover rounded-lg border-2 border-white shadow-lg"
             style={{ transform: "scaleX(-1)" }} // Mirror effect
-            onLoadedMetadata={() => console.log("Local video metadata loaded")}
-            onCanPlay={() => console.log("Local video can play")}
+            onLoadedMetadata={() => {}}
+            onCanPlay={() => {}}
           />
           {/* Local username overlay for full screen */}
           <div className="absolute bottom-4 left-4 bg-black bg-opacity-70 text-white px-3 py-2 rounded text-lg font-medium">
@@ -232,16 +219,11 @@ const VideoGrid = ({
                     ref={(video) => {
                       if (video && stream) {
                         video.srcObject = stream;
-                        console.log(`Set video srcObject for ${socketId}`);
                       }
                     }}
                     className="w-full h-full object-cover rounded-lg"
-                    onLoadedMetadata={() => {
-                      console.log(`Video metadata loaded for ${socketId}`);
-                    }}
-                    onCanPlay={() => {
-                      console.log(`Video can play for ${socketId}`);
-                    }}
+                    onLoadedMetadata={() => {}}
+                    onCanPlay={() => {}}
                     onError={(e) => {
                       console.error(`Video error for ${socketId}:`, e);
                     }}

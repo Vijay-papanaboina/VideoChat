@@ -221,8 +221,29 @@ export const useScreenShare = (
   // Cleanup function
   const cleanup = useCallback(() => {
     console.log("Cleaning up screen share");
-    stopScreenShare();
-  }, [stopScreenShare]);
+
+    // Force stop screen share if active
+    if (isScreenSharing) {
+      console.log("Force stopping screen share during cleanup");
+      stopScreenShare();
+    }
+
+    // Additional cleanup for screen stream
+    if (screenStream) {
+      console.log("Stopping screen stream tracks during cleanup");
+      screenStream.getTracks().forEach((track) => {
+        console.log("Stopping screen track:", track.kind, track.label);
+        track.stop();
+      });
+    }
+
+    // Reset all screen share state
+    setScreenStream(null);
+    setIsScreenSharing(false);
+    setScreenShareType(null);
+
+    console.log("Screen share cleanup completed");
+  }, [stopScreenShare, isScreenSharing, screenStream]);
 
   // Cleanup on unmount
   useEffect(() => {

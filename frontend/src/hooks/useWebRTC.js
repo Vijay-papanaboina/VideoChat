@@ -222,19 +222,45 @@ export const useWebRTC = (socketRef) => {
   // Cleanup function
   const cleanup = useCallback(() => {
     console.log("Cleaning up WebRTC");
+
     // Stop all media tracks
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => {
-        console.log("Stopping track:", track.kind, track.label);
+      const tracks = localStreamRef.current.getTracks();
+      console.log(`Found ${tracks.length} tracks to stop`);
+
+      tracks.forEach((track) => {
+        console.log(
+          "Stopping track:",
+          track.kind,
+          track.label,
+          "enabled:",
+          track.enabled
+        );
         track.stop();
+        // Ensure track is stopped
+        if (track.readyState === "live") {
+          console.warn("Track still live after stop(), forcing stop");
+          track.stop();
+        }
       });
+
+      // Clear the stream reference
+      localStreamRef.current = null;
     }
+
     // Close all peer connections
     const peerConnections = peerConnectionsRef.current;
-    Object.values(peerConnections).forEach((pc) => {
-      console.log("Closing peer connection");
-      pc.close();
+    Object.entries(peerConnections).forEach(([socketId, pc]) => {
+      console.log("Closing peer connection for socket:", socketId);
+      if (pc && pc.connectionState !== "closed") {
+        pc.close();
+      }
     });
+
+    // Clear peer connections
+    peerConnectionsRef.current = {};
+
+    console.log("WebRTC cleanup completed");
   }, []);
 
   return {

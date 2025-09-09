@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 
 /**
  * Custom hook for managing media controls (audio/video mute)
@@ -28,10 +28,42 @@ export const useMediaControls = (localStreamRef) => {
     }
   };
 
+  // Force stop all media tracks
+  const forceStopAllTracks = useCallback(() => {
+    console.log("Force stopping all media tracks from useMediaControls");
+    if (localStreamRef.current) {
+      const tracks = localStreamRef.current.getTracks();
+      console.log(`Force stopping ${tracks.length} tracks from media controls`);
+
+      tracks.forEach((track) => {
+        console.log(
+          `Force stopping track: ${track.kind} - ${track.label} (enabled: ${track.enabled}, readyState: ${track.readyState})`
+        );
+
+        // Disable the track first
+        track.enabled = false;
+
+        // Then stop it
+        track.stop();
+
+        // Verify it's stopped
+        if (track.readyState === "live") {
+          console.warn(
+            `Track ${track.kind} still live after stop, trying again`
+          );
+          track.stop();
+        }
+      });
+
+      console.log("All tracks force stopped from media controls");
+    }
+  }, [localStreamRef]);
+
   return {
     isAudioMuted,
     isVideoMuted,
     toggleAudio,
     toggleVideo,
+    forceStopAllTracks,
   };
 };

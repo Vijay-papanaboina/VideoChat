@@ -1,43 +1,46 @@
-import { useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { useState } from "react";
+import { useAuthActions, useAuthState } from "../../stores/authStore";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 const LoginForm = ({ onSwitchToRegister, onSuccess }) => {
-  const { login } = useAuth();
+  const { login } = useAuthActions();
+  const { isLoading, error } = useAuthState();
   const [formData, setFormData] = useState({
-    username: '',
-    password: '',
+    username: "",
+    password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [localError, setLocalError] = useState("");
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
     // Clear error when user starts typing
-    if (error) setError('');
+    if (localError) setLocalError("");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
+    setLocalError("");
 
-    try {
-      await login(formData);
+    const result = await login(formData);
+    if (result.success) {
       onSuccess?.();
-    } catch (error) {
-      setError(error.message || 'Login failed');
-    } finally {
-      setLoading(false);
+    } else {
+      setLocalError(result.error || "Login failed");
     }
   };
 
@@ -45,15 +48,13 @@ const LoginForm = ({ onSwitchToRegister, onSuccess }) => {
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
-        <CardDescription>
-          Sign in to your VideoCallApp account
-        </CardDescription>
+        <CardDescription>Sign in to your VideoCallApp account</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
+          {(error || localError) && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
-              {error}
+              {error || localError}
             </div>
           )}
 
@@ -67,7 +68,7 @@ const LoginForm = ({ onSwitchToRegister, onSuccess }) => {
               onChange={handleChange}
               placeholder="Enter your username or email"
               required
-              disabled={loading}
+              disabled={isLoading}
             />
           </div>
 
@@ -77,12 +78,12 @@ const LoginForm = ({ onSwitchToRegister, onSuccess }) => {
               <Input
                 id="password"
                 name="password"
-                type={showPassword ? 'text' : 'password'}
+                type={showPassword ? "text" : "password"}
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="Enter your password"
                 required
-                disabled={loading}
+                disabled={isLoading}
               />
               <Button
                 type="button"
@@ -90,7 +91,7 @@ const LoginForm = ({ onSwitchToRegister, onSuccess }) => {
                 size="sm"
                 className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                 onClick={() => setShowPassword(!showPassword)}
-                disabled={loading}
+                disabled={isLoading}
               >
                 {showPassword ? (
                   <EyeOff className="h-4 w-4" />
@@ -101,30 +102,26 @@ const LoginForm = ({ onSwitchToRegister, onSuccess }) => {
             </div>
           </div>
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={loading}
-          >
-            {loading ? (
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Signing In...
               </>
             ) : (
-              'Sign In'
+              "Sign In"
             )}
           </Button>
         </form>
 
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
-            Don't have an account?{' '}
+            Don't have an account?{" "}
             <Button
               variant="link"
               className="p-0 h-auto font-medium"
               onClick={onSwitchToRegister}
-              disabled={loading}
+              disabled={isLoading}
             >
               Sign up
             </Button>

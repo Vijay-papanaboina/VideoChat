@@ -5,6 +5,7 @@ import {
   boolean,
   integer,
   timestamp,
+  text,
 } from "drizzle-orm/pg-core";
 
 // Enums
@@ -91,4 +92,28 @@ export const userFavorites = pgTable("user_favorites", {
   roomId: varchar("room_id", { length: 50 }).notNull(),
   roomName: varchar("room_name", { length: 100 }), // Optional room name
   addedAt: timestamp("added_at").defaultNow(),
+});
+
+// Chat messages table
+export const chatMessages = pgTable("chat_messages", {
+  id: serial("id").primaryKey(),
+  roomId: varchar("room_id", { length: 50 }).notNull(),
+  username: varchar("username", { length: 50 }).notNull(),
+  userId: integer("user_id").references(() => users.id, {
+    onDelete: "set null",
+  }), // Allow null for guests
+  message: text("message").notNull(),
+  messageType: varchar("message_type", { length: 20 }).default("text"), // text, emoji, system
+  timestamp: timestamp("timestamp").defaultNow(),
+  isDeleted: boolean("is_deleted").default(false),
+});
+
+// Room chat sessions table (tracks active chat sessions)
+export const roomChatSessions = pgTable("room_chat_sessions", {
+  id: serial("id").primaryKey(),
+  roomId: varchar("room_id", { length: 50 }).notNull().unique(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  lastMessageAt: timestamp("last_message_at"),
+  messageCount: integer("message_count").default(0),
 });
