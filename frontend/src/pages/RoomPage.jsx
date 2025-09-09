@@ -7,12 +7,21 @@ import { Monitor } from "lucide-react";
 import { useWebRTC } from "../hooks/useWebRTC";
 import { useMediaControls } from "../hooks/useMediaControls";
 import { useScreenShare } from "../hooks/useScreenShare";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuthState } from "../stores/authStore";
+import { useChatActions } from "../stores/chatStore";
 
 // Import components
 import MediaControls from "../components/MediaControls";
 import VideoGrid from "../components/VideoGrid";
 import CredentialPrompt from "../components/CredentialPrompt";
+import Chat from "../components/chat/Chat";
+
+// Import utilities
+import {
+  forceStopAllMediaTracks,
+  stopStreamTracks,
+  debugMediaTracks,
+} from "../utils/mediaCleanup";
 
 /**
  * RoomPage Component (Refactored)
@@ -22,7 +31,7 @@ const RoomPage = () => {
   const { roomId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuthState();
 
   // Refs for socket
   const socketRef = useRef(null);
@@ -49,8 +58,15 @@ const RoomPage = () => {
     cleanup,
   } = useWebRTC(socketRef);
 
-  const { isAudioMuted, isVideoMuted, toggleAudio, toggleVideo } =
-    useMediaControls(localStreamRef);
+  const {
+    isAudioMuted,
+    isVideoMuted,
+    toggleAudio,
+    toggleVideo,
+    forceStopAllTracks,
+  } = useMediaControls(localStreamRef);
+
+  const { toggleChat } = useChatActions();
 
   const {
     isScreenSharing,
@@ -85,6 +101,32 @@ const RoomPage = () => {
     }
     console.log("Credentials found, proceeding with room setup");
 
+    // Capture ref value for cleanup
+    const currentStreamRef = localStreamRef;
+
+    // Add beforeunload event listener to ensure cleanup on page close
+    const handleBeforeUnload = () => {
+      console.log("Page unloading - stopping media tracks");
+      if (currentStreamRef.current) {
+        const tracks = currentStreamRef.current.getTracks();
+        tracks.forEach((track) => {
+          console.log(
+            "Beforeunload: stopping track:",
+            track.kind,
+            track.label,
+            "enabled:",
+            track.enabled,
+            "readyState:",
+            track.readyState
+          );
+          track.enabled = false;
+          track.stop();
+        });
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
     // Initialize socket connection
     const serverUrl =
       import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
@@ -98,7 +140,7 @@ const RoomPage = () => {
           roomId,
           password,
           username,
-          userId: isAuthenticated() ? user.id : null,
+          userId: isAuthenticated ? user.id : null,
         });
 
         // Setup socket event listeners
@@ -123,12 +165,46 @@ const RoomPage = () => {
 
     // Cleanup function on component unmount
     return () => {
+      console.log("Component unmounting - performing cleanup");
+
+      // Remove beforeunload event listener
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+
+      // AGGRESSIVE cleanup on unmount
+      forceStopAllTracks();
+      stopStreamTracks(currentStreamRef);
+      forceStopAllMediaTracks();
+
+      // Also try direct approach
+      if (currentStreamRef.current) {
+        const tracks = currentStreamRef.current.getTracks();
+        console.log(`Unmount cleanup: stopping ${tracks.length} media tracks`);
+        tracks.forEach((track) => {
+          console.log(
+            "Unmount cleanup: stopping track:",
+            track.kind,
+            track.label,
+            "enabled:",
+            track.enabled,
+            "readyState:",
+            track.readyState
+          );
+          track.enabled = false;
+          track.stop();
+        });
+      }
+
+      // Cleanup WebRTC and screen share
       cleanup();
       cleanupScreenShare();
+
       // Disconnect the socket
       if (socketRef.current) {
+        console.log("Unmount cleanup: disconnecting socket");
         socketRef.current.disconnect();
       }
+
+      console.log("Unmount cleanup completed");
     };
   }, [
     roomId,
@@ -141,6 +217,8 @@ const RoomPage = () => {
     cleanupScreenShare,
     isAuthenticated,
     user?.id,
+    localStreamRef,
+    forceStopAllTracks,
   ]);
 
   // Stream click handlers
@@ -155,12 +233,56 @@ const RoomPage = () => {
   };
 
   const leaveRoom = () => {
+    console.log("Leaving room - starting AGGRESSIVE cleanup");
+
+    // Debug current state before cleanup
+    debugMediaTracks();
+
+    // Method 1: Use the media controls force stop
+    forceStopAllTracks();
+
+    // Method 2: Use the utility function for stream reference
+    stopStreamTracks(localStreamRef);
+
+    // Method 3: Global aggressive cleanup
+    forceStopAllMediaTracks();
+
+    // Method 4: Direct approach as fallback
+    if (localStreamRef.current) {
+      const tracks = localStreamRef.current.getTracks();
+      console.log(`Direct stopping ${tracks.length} local media tracks`);
+      tracks.forEach((track) => {
+        console.log(
+          "Direct stopping track:",
+          track.kind,
+          track.label,
+          "enabled:",
+          track.enabled,
+          "readyState:",
+          track.readyState
+        );
+        track.enabled = false;
+        track.stop();
+      });
+    }
+
+    // Cleanup WebRTC connections
     cleanup();
+
+    // Cleanup screen share
     cleanupScreenShare();
+
     // Disconnect the socket
     if (socketRef.current) {
+      console.log("Disconnecting socket");
       socketRef.current.disconnect();
     }
+
+    // Debug state after cleanup
+    console.log("=== STATE AFTER CLEANUP ===");
+    debugMediaTracks();
+
+    console.log("AGGRESSIVE cleanup completed, navigating to home");
     // Navigate back to home
     navigate("/");
   };
@@ -202,10 +324,6 @@ const RoomPage = () => {
   const isFocused = focusedStream !== null;
   const gridClass = getLayoutClasses(remoteStreamsArray.length, isFocused);
 
-  console.log("Remote streams count:", remoteStreamsArray.length);
-  console.log("Remote streams:", remoteStreamsArray);
-  console.log("Layout class:", gridClass);
-
   return (
     <div className="relative w-screen h-screen bg-black">
       {/* Credential Prompt Modal */}
@@ -225,6 +343,7 @@ const RoomPage = () => {
         onToggleAudio={toggleAudio}
         onToggleVideo={toggleVideo}
         onToggleScreenShare={toggleScreenShare}
+        onToggleChat={toggleChat}
         onLeaveRoom={leaveRoom}
       />
 
@@ -241,6 +360,14 @@ const RoomPage = () => {
         focusedStream={focusedStream}
         onStreamClick={handleStreamClick}
         gridClass={gridClass}
+      />
+
+      {/* Chat Component */}
+      <Chat
+        socketRef={socketRef}
+        username={username}
+        roomId={roomId}
+        userId={user?.id || null}
       />
 
       {/* Local video in the corner (only show when there are remote streams and not focused) */}
@@ -262,7 +389,6 @@ const RoomPage = () => {
               ref={(video) => {
                 if (video && localStreamRef.current) {
                   video.srcObject = localStreamRef.current;
-                  console.log("Set local video srcObject (corner)");
                 }
               }}
               className="w-full h-full object-cover rounded-lg border-2 border-white shadow-lg"

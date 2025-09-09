@@ -1,48 +1,54 @@
-import { useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { useState } from "react";
+import { useAuthActions, useAuthState } from "../../stores/authStore";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 const RegisterForm = ({ onSwitchToLogin, onSuccess }) => {
-  const { register } = useAuth();
+  const { register } = useAuthActions();
+  const { isLoading, error } = useAuthState();
   const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    firstName: '',
-    lastName: '',
-    bio: '',
+    username: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    firstName: "",
+    lastName: "",
+    bio: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [localError, setLocalError] = useState("");
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
     // Clear error when user starts typing
-    if (error) setError('');
+    if (localError) setLocalError("");
   };
 
   const validateForm = () => {
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setLocalError("Passwords do not match");
       return false;
     }
     if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
+      setLocalError("Password must be at least 6 characters long");
       return false;
     }
     if (formData.username.length < 3) {
-      setError('Username must be at least 3 characters long');
+      setLocalError("Username must be at least 3 characters long");
       return false;
     }
     return true;
@@ -50,20 +56,17 @@ const RegisterForm = ({ onSwitchToLogin, onSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!validateForm()) return;
-    
-    setLoading(true);
-    setError('');
 
-    try {
-      const { confirmPassword, ...userData } = formData;
-      await register(userData);
+    if (!validateForm()) return;
+
+    setLocalError("");
+
+    const { confirmPassword: _, ...userData } = formData;
+    const result = await register(userData);
+    if (result.success) {
       onSuccess?.();
-    } catch (error) {
-      setError(error.message || 'Registration failed');
-    } finally {
-      setLoading(false);
+    } else {
+      setLocalError(result.error || "Registration failed");
     }
   };
 
@@ -77,9 +80,9 @@ const RegisterForm = ({ onSwitchToLogin, onSuccess }) => {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
+          {(error || localError) && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
-              {error}
+              {error || localError}
             </div>
           )}
 
@@ -93,7 +96,7 @@ const RegisterForm = ({ onSwitchToLogin, onSuccess }) => {
                 value={formData.firstName}
                 onChange={handleChange}
                 placeholder="John"
-                disabled={loading}
+                disabled={isLoading}
               />
             </div>
             <div className="space-y-2">
@@ -105,7 +108,7 @@ const RegisterForm = ({ onSwitchToLogin, onSuccess }) => {
                 value={formData.lastName}
                 onChange={handleChange}
                 placeholder="Doe"
-                disabled={loading}
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -120,7 +123,7 @@ const RegisterForm = ({ onSwitchToLogin, onSuccess }) => {
               onChange={handleChange}
               placeholder="johndoe"
               required
-              disabled={loading}
+              disabled={isLoading}
             />
           </div>
 
@@ -134,7 +137,7 @@ const RegisterForm = ({ onSwitchToLogin, onSuccess }) => {
               onChange={handleChange}
               placeholder="john@example.com"
               required
-              disabled={loading}
+              disabled={isLoading}
             />
           </div>
 
@@ -144,12 +147,12 @@ const RegisterForm = ({ onSwitchToLogin, onSuccess }) => {
               <Input
                 id="password"
                 name="password"
-                type={showPassword ? 'text' : 'password'}
+                type={showPassword ? "text" : "password"}
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="Create a password"
                 required
-                disabled={loading}
+                disabled={isLoading}
               />
               <Button
                 type="button"
@@ -157,7 +160,7 @@ const RegisterForm = ({ onSwitchToLogin, onSuccess }) => {
                 size="sm"
                 className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                 onClick={() => setShowPassword(!showPassword)}
-                disabled={loading}
+                disabled={isLoading}
               >
                 {showPassword ? (
                   <EyeOff className="h-4 w-4" />
@@ -174,12 +177,12 @@ const RegisterForm = ({ onSwitchToLogin, onSuccess }) => {
               <Input
                 id="confirmPassword"
                 name="confirmPassword"
-                type={showConfirmPassword ? 'text' : 'password'}
+                type={showConfirmPassword ? "text" : "password"}
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 placeholder="Confirm your password"
                 required
-                disabled={loading}
+                disabled={isLoading}
               />
               <Button
                 type="button"
@@ -187,7 +190,7 @@ const RegisterForm = ({ onSwitchToLogin, onSuccess }) => {
                 size="sm"
                 className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                disabled={loading}
+                disabled={isLoading}
               >
                 {showConfirmPassword ? (
                   <EyeOff className="h-4 w-4" />
@@ -207,34 +210,30 @@ const RegisterForm = ({ onSwitchToLogin, onSuccess }) => {
               value={formData.bio}
               onChange={handleChange}
               placeholder="Tell us about yourself"
-              disabled={loading}
+              disabled={isLoading}
             />
           </div>
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={loading}
-          >
-            {loading ? (
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Creating Account...
               </>
             ) : (
-              'Create Account'
+              "Create Account"
             )}
           </Button>
         </form>
 
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
-            Already have an account?{' '}
+            Already have an account?{" "}
             <Button
               variant="link"
               className="p-0 h-auto font-medium"
               onClick={onSwitchToLogin}
-              disabled={loading}
+              disabled={isLoading}
             >
               Sign in
             </Button>

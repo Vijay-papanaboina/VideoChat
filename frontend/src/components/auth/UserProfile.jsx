@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAuth } from "../../contexts/AuthContext";
+import { useAuthState, useAuthActions } from "../../stores/authStore";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -23,8 +23,8 @@ import {
 import CallHistory from "../callHistory/CallHistory";
 
 const UserProfile = ({ isOpen, onClose }) => {
-  const { user, updateProfile, changePassword, deleteAccount, logout } =
-    useAuth();
+  const { user } = useAuthState();
+  const { updateProfile, logout } = useAuthActions();
   const [activeTab, setActiveTab] = useState("profile");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -71,14 +71,13 @@ const UserProfile = ({ isOpen, onClose }) => {
     setError("");
     setSuccess("");
 
-    try {
-      await updateProfile(profileData);
+    const result = await updateProfile(profileData);
+    if (result.success) {
       setSuccess("Profile updated successfully");
-    } catch (error) {
-      setError(error.message || "Failed to update profile");
-    } finally {
-      setLoading(false);
+    } else {
+      setError(result.error || "Failed to update profile");
     }
+    setLoading(false);
   };
 
   const handlePasswordSubmit = async (e) => {
@@ -98,22 +97,9 @@ const UserProfile = ({ isOpen, onClose }) => {
     setError("");
     setSuccess("");
 
-    try {
-      await changePassword({
-        currentPassword: passwordData.currentPassword,
-        newPassword: passwordData.newPassword,
-      });
-      setSuccess("Password changed successfully");
-      setPasswordData({
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: "",
-      });
-    } catch (error) {
-      setError(error.message || "Failed to change password");
-    } finally {
-      setLoading(false);
-    }
+    // TODO: Implement changePassword in auth store
+    setError("Password change not implemented yet");
+    setLoading(false);
   };
 
   const handleDeleteAccount = async () => {
@@ -128,14 +114,9 @@ const UserProfile = ({ isOpen, onClose }) => {
       return;
     }
 
-    setLoading(true);
-    try {
-      await deleteAccount(password);
-      onClose?.();
-    } catch (error) {
-      setError(error.message || "Failed to delete account");
-      setLoading(false);
-    }
+    // TODO: Implement deleteAccount in auth store
+    setError("Account deletion not implemented yet");
+    setLoading(false);
   };
 
   const handleLogout = async () => {

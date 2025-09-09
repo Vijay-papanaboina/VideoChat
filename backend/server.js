@@ -41,6 +41,8 @@ app.use("/api/auth", authRoutes);
 // Call history routes
 app.use("/api/call-history", callHistoryRoutes);
 
+// No chat routes - pure WebSocket messaging only
+
 // In-memory data stores for rooms and their users
 // rooms structure: { roomId: { password: "...", users: { socketId: "username", ... } } }
 const rooms = {};
@@ -65,6 +67,7 @@ io.on("connection", (socket) => {
       rooms[roomId] = {
         password: password,
         users: {},
+        isActive: true,
       };
       console.log(`🚪 Room created: ${roomId}`);
     }
@@ -91,6 +94,12 @@ io.on("connection", (socket) => {
     }
 
     // --- Join Logic ---
+    // Reactivate room if it was empty
+    if (rooms[roomId].isActive === false) {
+      rooms[roomId].isActive = true;
+      console.log(`🔄 Reactivating room ${roomId} - user rejoining`);
+    }
+
     // Add the user to the room and join the socket to the room's channel
     rooms[roomId].users[socket.id] = { username, userId };
     socket.join(roomId);
@@ -139,6 +148,11 @@ io.on("connection", (socket) => {
     // Send the list of other users to the new user
     socket.emit("all-users", otherUsers);
 
+    // No chat history loading - pure real-time messaging only
+    console.log(
+      `💬 User ${username} joined room ${roomId} - real-time chat enabled`
+    );
+
     // Notify all other users in the room that a new user has joined
     socket.to(roomId).emit("user-joined", { socketId: socket.id, username });
   });
@@ -185,8 +199,50 @@ io.on("connection", (socket) => {
     });
   });
 
+  // Handle chat events - PURE WEBSOCKET MESSAGING (NO DATABASE)
+  socket.on("chat-message", (data) => {
+    console.log(
+      `💬 Chat message from ${data.username} in room ${data.roomId}: ${data.message}`
+    );
+
+    // Debug: Check if room exists and has users
+    if (rooms[data.roomId]) {
+      const userCount = Object.keys(rooms[data.roomId].users).length;
+      console.log(
+        `📊 Room ${data.roomId} has ${userCount} users:`,
+        Object.keys(rooms[data.roomId].users)
+      );
+    } else {
+      console.log(`❌ Room ${data.roomId} does not exist!`);
+    }
+
+    // Broadcast message to all users in the room except sender
+    socket.to(data.roomId).emit("chat-message", data);
+    console.log(`📤 Broadcasted message to room ${data.roomId}`);
+
+    // Send confirmation back to sender
+    socket.emit("chat-message-sent", data);
+    console.log(`✅ Sent confirmation to sender ${data.username}`);
+  });
+
+  socket.on("typing", (data) => {
+    // Broadcast typing indicator to other users in the room
+    socket.to(data.roomId).emit("user-typing", {
+      username: data.username,
+      roomId: data.roomId,
+    });
+  });
+
+  socket.on("stop-typing", (data) => {
+    // Broadcast stop typing indicator to other users in the room
+    socket.to(data.roomId).emit("user-stopped-typing", {
+      username: data.username,
+      roomId: data.roomId,
+    });
+  });
+
   // Handle user disconnection
-  socket.on("disconnect", () => {
+  socket.on("disconnect", async () => {
     console.log(`�� User disconnected: ${socket.id}`);
     let userRoomId = null;
 
@@ -196,10 +252,16 @@ io.on("connection", (socket) => {
         userRoomId = roomId;
         delete rooms[roomId].users[socket.id];
 
-        // If the room becomes empty, delete it
+        // If the room becomes empty, mark it as inactive but keep it for potential rejoining
         if (Object.keys(rooms[roomId].users).length === 0) {
-          delete rooms[roomId];
-          console.log(`🗑️ Room ${roomId} deleted as it is now empty.`);
+          // No database operations - pure in-memory room management
+          console.log(`📝 Room ${roomId} is now empty`);
+
+          // Keep the room in memory but mark as empty
+          rooms[roomId].isActive = false;
+          console.log(
+            `📝 Room ${roomId} marked as inactive (empty but persistent)`
+          );
         }
         break;
       }

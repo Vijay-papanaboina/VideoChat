@@ -6,6 +6,7 @@ import {
   Monitor,
   MonitorOff,
   PhoneOff,
+  MessageCircle,
 } from "lucide-react";
 
 /**
@@ -20,6 +21,7 @@ const MediaControls = ({
   onToggleAudio,
   onToggleVideo,
   onToggleScreenShare,
+  onToggleChat,
   onLeaveRoom,
 }) => {
   return (
@@ -79,6 +81,15 @@ const MediaControls = ({
             )}
           </button>
         )}
+
+        {/* Chat Toggle Button */}
+        <button
+          onClick={onToggleChat}
+          className="p-3 rounded-full bg-gray-600 hover:bg-gray-700 text-white transition-all duration-200"
+          aria-label="Toggle chat"
+        >
+          <MessageCircle className="w-5 h-5" />
+        </button>
 
         {/* Leave Room Button */}
         <button
