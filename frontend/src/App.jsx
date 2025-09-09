@@ -1,5 +1,5 @@
 import { Routes, Route } from "react-router-dom";
-import { ThemeProvider } from "./components/theme-provider";
+import { ThemeProvider } from "./components/ui/theme-provider";
 import HomePage from "./pages/HomePage";
 import RoomPage from "./pages/RoomPage";
 

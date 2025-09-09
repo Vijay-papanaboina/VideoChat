@@ -11,9 +11,9 @@ import { useAuthState } from "../stores/authStore";
 import { useChatActions } from "../stores/chatStore";
 
 // Import components
-import MediaControls from "../components/MediaControls";
-import VideoGrid from "../components/VideoGrid";
-import CredentialPrompt from "../components/CredentialPrompt";
+import MediaControls from "../components/room/MediaControls";
+import VideoGrid from "../components/room/VideoGrid";
+import CredentialPrompt from "../components/room/CredentialPrompt";
 import Chat from "../components/chat/Chat";
 
 // Import utilities
