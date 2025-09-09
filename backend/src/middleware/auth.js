@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import { UserRepository } from "../repositories/userRepository.js";
+import { authService } from "../services/authService.js";
 
 const JWT_SECRET =
   process.env.JWT_SECRET || "your-super-secret-jwt-key-change-in-production";
@@ -21,7 +21,7 @@ export const authenticateToken = async (req, res, next) => {
     const decoded = jwt.verify(token, JWT_SECRET);
 
     // Get user from database
-    const user = await UserRepository.findById(decoded.userId);
+    const user = await authService.findUserById(decoded.userId);
 
     if (!user) {
       return res.status(401).json({
@@ -57,7 +57,7 @@ export const optionalAuth = async (req, res, next) => {
 
     if (token) {
       const decoded = jwt.verify(token, JWT_SECRET);
-      const user = await UserRepository.findById(decoded.userId);
+      const user = await authService.findUserById(decoded.userId);
 
       if (user && user.isActive) {
         req.user = user;

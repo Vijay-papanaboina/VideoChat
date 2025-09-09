@@ -7,11 +7,8 @@ import dotenv from "dotenv";
 dotenv.config();
 
 // Import routes
-import { router as authRoutes } from "./routes/auth.js";
+import authRoutes from "./routes/auth.js";
 import chatRoutes from "./routes/chat.js";
-
-// Import services for WebSocket integration
-import { ChatService } from "./src/services/chatService.js";
 
 // Import middleware
 import { errorHandler, notFound } from "./src/middleware/errorHandler.js";

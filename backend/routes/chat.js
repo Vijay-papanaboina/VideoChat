@@ -1,6 +1,6 @@
 import express from "express";
-import { ChatController } from "../src/controllers/chatController.js";
-import { authenticateToken, optionalAuth } from "../src/middleware/auth.js";
+import * as chatController from "../src/controllers/chatController.js";
+import { authenticateToken } from "../src/middleware/auth.js";
 import {
   validateChatMessage,
   validatePagination,
@@ -13,28 +13,28 @@ const router = express.Router();
 router.use(authenticateToken);
 
 // Message routes
-router.post("/send", validateChatMessage, ChatController.sendMessage);
-router.get("/room/:roomId", validatePagination, ChatController.getRoomMessages);
-router.get("/room/:roomId/recent", ChatController.getRecentMessages);
-router.get("/room/:roomId/count", ChatController.getRoomMessageCount);
-router.get("/room/:roomId/search", ChatController.searchMessages);
-router.get("/room/:roomId/activity", ChatController.getRoomActivitySummary);
+router.post("/send", validateChatMessage, chatController.sendMessage);
+router.get("/room/:roomId", validatePagination, chatController.getRoomMessages);
+router.get("/room/:roomId/recent", chatController.getRecentMessages);
+router.get("/room/:roomId/count", chatController.getRoomMessageCount);
+router.get("/room/:roomId/search", chatController.searchMessages);
+router.get("/room/:roomId/activity", chatController.getRoomActivitySummary);
 router.get(
   "/room/:roomId/by-date-range",
   validateDateRange,
-  ChatController.getMessagesByDateRange
+  chatController.getMessagesByDateRange
 );
 
 // Message management routes
-router.get("/message/:messageId", ChatController.getMessageById);
-router.put("/message/:messageId", ChatController.editMessage);
-router.delete("/message/:messageId", ChatController.deleteMessage);
+router.get("/message/:messageId", chatController.getMessageById);
+router.put("/message/:messageId", chatController.editMessage);
+router.delete("/message/:messageId", chatController.deleteMessage);
 
 // User message routes
 router.get(
   "/user/messages",
   validatePagination,
-  ChatController.getUserMessages
+  chatController.getUserMessages
 );
 
 export default router;

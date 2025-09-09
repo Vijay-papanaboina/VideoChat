@@ -164,6 +164,66 @@ export const validatePagination = (req, res, next) => {
   next();
 };
 
+// Validate profile update
+export const validateProfileUpdate = (req, res, next) => {
+  const {
+    firstName,
+    lastName,
+    avatar,
+    bio,
+    emailNotifications,
+    pushNotifications,
+  } = req.body;
+  const errors = [];
+
+  // First name validation
+  if (firstName !== undefined && (!firstName || firstName.trim().length < 1)) {
+    errors.push("First name cannot be empty");
+  }
+
+  // Last name validation
+  if (lastName !== undefined && (!lastName || lastName.trim().length < 1)) {
+    errors.push("Last name cannot be empty");
+  }
+
+  // Avatar validation (optional URL)
+  if (avatar !== undefined && avatar && typeof avatar !== "string") {
+    errors.push("Avatar must be a valid URL string");
+  }
+
+  // Bio validation (optional)
+  if (bio !== undefined && bio && typeof bio !== "string") {
+    errors.push("Bio must be a string");
+  }
+  if (bio && bio.length > 500) {
+    errors.push("Bio must be less than 500 characters");
+  }
+
+  // Boolean validations
+  if (
+    emailNotifications !== undefined &&
+    typeof emailNotifications !== "boolean"
+  ) {
+    errors.push("Email notifications must be a boolean value");
+  }
+  if (
+    pushNotifications !== undefined &&
+    typeof pushNotifications !== "boolean"
+  ) {
+    errors.push("Push notifications must be a boolean value");
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Validation failed",
+      errors,
+    });
+  }
+
+  next();
+};
+
 // Validate date range
 export const validateDateRange = (req, res, next) => {
   const { startDate, endDate } = req.query;

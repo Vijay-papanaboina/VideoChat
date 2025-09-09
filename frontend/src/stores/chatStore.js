@@ -18,7 +18,7 @@ import { create } from "zustand";
 export const useChatStore = create((set, get) => ({
   // State
   messages: [],
-  isChatOpen: true, // Open by default
+  isChatOpen: false, // Open by default
   currentRoomId: null,
   isTyping: false,
   typingUsers: [],
