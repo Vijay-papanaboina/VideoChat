@@ -192,31 +192,37 @@ export const useScreenShare = (
   };
 
   // Handle video mute changes during screen sharing
-  const handleVideoMuteChange = useCallback(() => {
-    if (isScreenSharing && screenStream) {
-      const videoTrack = screenStream.getVideoTracks()[0];
-      if (videoTrack) {
-        const trackToSend = isVideoMuted ? createBlankVideoTrack() : videoTrack;
+  const handleVideoMuteChange = useCallback(
+    (videoMuted) => {
+      if (isScreenSharing && screenStream) {
+        const videoTrack = screenStream.getVideoTracks()[0];
+        if (videoTrack) {
+          const trackToSend = videoMuted ? createBlankVideoTrack() : videoTrack;
 
-        Object.values(peerConnectionsRef.current).forEach((pc) => {
-          const sender = pc
-            .getSenders()
-            .find((s) => s.track && s.track.kind === "video");
-          if (sender) {
-            sender.replaceTrack(trackToSend);
-            console.log(
-              `Updated video track for screen share (muted: ${isVideoMuted})`
-            );
-          }
-        });
+          Object.values(peerConnectionsRef.current).forEach((pc) => {
+            const sender = pc
+              .getSenders()
+              .find((s) => s.track && s.track.kind === "video");
+            if (sender) {
+              sender.replaceTrack(trackToSend);
+              console.log(
+                `Updated video track for screen share (muted: ${videoMuted})`
+              );
+            }
+          });
+        }
       }
-    }
-  }, [isScreenSharing, screenStream, isVideoMuted, peerConnectionsRef]);
+    },
+    [isScreenSharing, screenStream, peerConnectionsRef]
+  );
 
-  // Watch for video mute changes during screen sharing
-  useEffect(() => {
-    handleVideoMuteChange();
-  }, [handleVideoMuteChange]);
+  // Expose the function to be called externally when video mute state changes
+  const updateVideoMuteState = useCallback(
+    (videoMuted) => {
+      handleVideoMuteChange(videoMuted);
+    },
+    [handleVideoMuteChange]
+  );
 
   // Cleanup function
   const cleanup = useCallback(() => {
@@ -261,6 +267,7 @@ export const useScreenShare = (
     startScreenShare,
     stopScreenShare,
     toggleScreenShare,
+    updateVideoMuteState,
     cleanup,
   };
 };

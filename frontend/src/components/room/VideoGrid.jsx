@@ -1,4 +1,4 @@
-import { Mic, MicOff, Video, VideoOff, Monitor } from "lucide-react";
+import { Monitor } from "lucide-react";
 
 /**
  * VideoGrid Component
@@ -10,8 +10,6 @@ const VideoGrid = ({
   localStreamRef,
   localStreamReady,
   username,
-  isAudioMuted,
-  isVideoMuted,
   isScreenSharing,
   remoteScreenSharing,
   focusedStream,
@@ -49,19 +47,6 @@ const VideoGrid = ({
           <div className="absolute bottom-4 left-4 bg-black bg-opacity-70 text-white px-3 py-2 rounded text-lg font-medium">
             {username} (You)
           </div>
-          {/* Mute indicators */}
-          {isAudioMuted && (
-            <div className="absolute top-4 left-4 bg-red-600 text-white px-2 py-1 rounded-full text-sm font-medium flex items-center gap-1">
-              <MicOff className="w-4 h-4" />
-              Muted
-            </div>
-          )}
-          {isVideoMuted && (
-            <div className="absolute top-4 right-4 bg-red-600 text-white px-2 py-1 rounded-full text-sm font-medium flex items-center gap-1">
-              <VideoOff className="w-4 h-4" />
-              {isScreenSharing ? "Screen Off" : "Camera Off"}
-            </div>
-          )}
           {/* Screen sharing indicator */}
           {isScreenSharing && (
             <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2">

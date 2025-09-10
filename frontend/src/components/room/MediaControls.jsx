@@ -18,6 +18,7 @@ const MediaControls = ({
   isVideoMuted,
   isScreenSharing,
   isScreenShareSupported,
+  isChatOpen,
   onToggleAudio,
   onToggleVideo,
   onToggleScreenShare,
@@ -85,7 +86,11 @@ const MediaControls = ({
         {/* Chat Toggle Button */}
         <button
           onClick={onToggleChat}
-          className="p-3 rounded-full bg-gray-600 hover:bg-gray-700 text-white transition-all duration-200"
+          className={`p-3 rounded-full transition-all duration-200 ${
+            isChatOpen
+              ? "bg-blue-600 hover:bg-blue-700 text-white"
+              : "bg-gray-600 hover:bg-gray-700 text-white"
+          }`}
           aria-label="Toggle chat"
         >
           <MessageCircle className="w-5 h-5" />
