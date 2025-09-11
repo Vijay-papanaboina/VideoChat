@@ -2,21 +2,22 @@ import express from "express";
 import * as chatController from "../src/controllers/chatController.js";
 import { authenticateToken } from "../src/middleware/auth.js";
 import {
-  validateChatMessage,
   validatePagination,
   validateDateRange,
 } from "../src/middleware/validation.js";
 
 const router = express.Router();
 
-// All routes require authentication
+// Guest routes (no authentication required)
+router.get("/room/:roomId/recent", chatController.getRecentMessages);
+router.get("/room/:roomId/count", chatController.getRoomMessageCount);
+// sendMessage removed - now handled via WebSocket
+
+// Authenticated routes (require authentication)
 router.use(authenticateToken);
 
 // Message routes
-router.post("/send", validateChatMessage, chatController.sendMessage);
 router.get("/room/:roomId", validatePagination, chatController.getRoomMessages);
-router.get("/room/:roomId/recent", chatController.getRecentMessages);
-router.get("/room/:roomId/count", chatController.getRoomMessageCount);
 router.get("/room/:roomId/search", chatController.searchMessages);
 router.get("/room/:roomId/activity", chatController.getRoomActivitySummary);
 router.get(

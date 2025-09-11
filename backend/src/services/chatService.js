@@ -12,9 +12,9 @@ export const sendMessage = async (messageData) => {
     messageType = "text",
   } = messageData;
 
-  // Validate input
-  if (!roomId || !userId || !username || !message) {
-    throw new Error("Room ID, user ID, username, and message are required");
+  // Validate input (userId can be null for guest users)
+  if (!roomId || !username || !message) {
+    throw new Error("Room ID, username, and message are required");
   }
 
   if (message.length > 1000) {
@@ -245,6 +245,22 @@ export const getMessageById = async (messageId) => {
   return message;
 };
 
+// Delete all messages for a room (when room is destroyed)
+export const deleteRoomMessages = async (roomId) => {
+  if (!roomId) {
+    throw new Error("Room ID is required");
+  }
+
+  console.log(`🗑️ Deleting all messages for room: ${roomId}`);
+
+  const result = await db
+    .delete(chatMessages)
+    .where(eq(chatMessages.roomId, roomId));
+
+  console.log(`✅ Deleted messages for room: ${roomId}`);
+  return result;
+};
+
 // Export all functions as a service object
 export const chatService = {
   sendMessage,
@@ -258,4 +274,5 @@ export const chatService = {
   getMessagesByDateRange,
   getRoomActivitySummary,
   getMessageById,
+  deleteRoomMessages,
 };

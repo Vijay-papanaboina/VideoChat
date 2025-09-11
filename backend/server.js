@@ -13,6 +13,10 @@ import chatRoutes from "./routes/chat.js";
 // Import middleware
 import { errorHandler, notFound } from "./src/middleware/errorHandler.js";
 
+// Import services for cleanup and room tracking
+import { chatService } from "./src/services/chatService.js";
+import { roomService } from "./src/services/roomService.js";
+
 // Initialize Express app and HTTP server
 const app = express();
 const server = http.createServer(app);
@@ -46,6 +50,15 @@ app.use("/api/chat", chatRoutes);
 const rooms = {};
 const MAX_USERS_PER_ROOM = 5; // Allow exactly 5 users (0-4 existing + 1 new = 5 total)
 
+// Function to delete all messages for a room when it's destroyed
+const deleteRoomMessages = async (roomId) => {
+  try {
+    await chatService.deleteRoomMessages(roomId);
+  } catch (error) {
+    console.error(`❌ Failed to delete messages for room ${roomId}:`, error);
+  }
+};
+
 // A simple root route for health checks
 app.get("/", (req, res) => {
   res.json({ message: "Video Call Server is running" });
@@ -67,7 +80,15 @@ io.on("connection", (socket) => {
         users: {},
         isActive: true,
       };
-      console.log(`🚪 Room created: ${roomId}`);
+      console.log(`🚪 Room created in memory: ${roomId}`);
+
+      // Track room session in database for analytics
+      try {
+        await roomService.createRoomSession(roomId);
+      } catch (error) {
+        console.error(`❌ Failed to create room session in DB:`, error);
+        // Continue with room creation even if DB fails
+      }
     }
 
     // Check if the provided password is correct
@@ -169,8 +190,8 @@ io.on("connection", (socket) => {
     });
   });
 
-  // Handle chat events - PURE WEBSOCKET MESSAGING (NO DATABASE)
-  socket.on("chat-message", (data) => {
+  // Handle chat events - WebSocket messaging with database persistence
+  socket.on("chat-message", async (data) => {
     console.log(
       `💬 Chat message from ${data.username} in room ${data.roomId}: ${data.message}`
     );
@@ -184,6 +205,30 @@ io.on("connection", (socket) => {
       );
     } else {
       console.log(`❌ Room ${data.roomId} does not exist!`);
+    }
+
+    // Save message to database
+    try {
+      await chatService.sendMessage({
+        roomId: data.roomId,
+        userId: data.userId || null,
+        username: data.username,
+        message: data.message,
+        messageType: data.type || "text",
+      });
+      console.log(`💾 Message saved to database`);
+
+      // Update message count in room session
+      try {
+        const messageCount = await chatService.getRoomMessageCount(data.roomId);
+        await roomService.updateRoomMessageCount(data.roomId, messageCount);
+      } catch (error) {
+        console.error(`❌ Failed to update message count:`, error);
+        // Don't fail the message send if count update fails
+      }
+    } catch (error) {
+      console.error(`❌ Failed to save message to database:`, error);
+      // Continue with WebSocket broadcast even if DB save fails
     }
 
     // Broadcast message to all users in the room except sender
@@ -222,15 +267,25 @@ io.on("connection", (socket) => {
         userRoomId = roomId;
         delete rooms[roomId].users[socket.id];
 
-        // If the room becomes empty, mark it as inactive but keep it for potential rejoining
+        // If the room becomes empty, completely destroy it
         if (Object.keys(rooms[roomId].users).length === 0) {
-          // No database operations - pure in-memory room management
           console.log(`📝 Room ${roomId} is now empty`);
 
-          // Keep the room in memory but mark as empty
-          rooms[roomId].isActive = false;
+          // Delete all messages for this room since it's being destroyed
+          await deleteRoomMessages(roomId);
+
+          // End room session in database for analytics
+          try {
+            await roomService.endRoomSession(roomId);
+          } catch (error) {
+            console.error(`❌ Failed to end room session in DB:`, error);
+            // Continue with room destruction even if DB fails
+          }
+
+          // Completely delete the room from memory
+          delete rooms[roomId];
           console.log(
-            `📝 Room ${roomId} marked as inactive (empty but persistent)`
+            `🗑️ Room ${roomId} completely destroyed and available for reuse`
           );
         }
         break;

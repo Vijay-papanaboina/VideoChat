@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { MicOff, VideoOff } from "lucide-react";
-import { useMuteState } from "../../hooks/useMuteState";
+import { useMuteState } from "../../contexts/MuteStateContext";
 
 /**
  * MuteIndicators Component

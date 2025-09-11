@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { useMuteState } from "../../hooks/useMuteState";
+import { useMuteState } from "../../contexts/MuteStateContext";
 import MediaControls from "./MediaControls";
 
 /**

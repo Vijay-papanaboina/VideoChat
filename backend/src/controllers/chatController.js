@@ -1,23 +1,26 @@
 import { chatService } from "../services/chatService.js";
 
-// Send a message
+// Send a message (supports both authenticated and guest users)
 export const sendMessage = async (req, res) => {
   try {
-    const { roomId, message, messageType = "text" } = req.body;
-    const userId = req.user.id;
-    const username = req.user.username;
+    const { roomId, message, messageType = "text", username } = req.body;
 
-    if (!roomId || !message) {
+    // For authenticated users, get from req.user
+    // For guest users, get from request body
+    const userId = req.user?.id || null;
+    const finalUsername = req.user?.username || username;
+
+    if (!roomId || !message || !finalUsername) {
       return res.status(400).json({
         success: false,
-        message: "Room ID and message are required",
+        message: "Room ID, message, and username are required",
       });
     }
 
     const newMessage = await chatService.sendMessage({
       roomId,
       userId,
-      username,
+      username: finalUsername,
       message,
       messageType,
     });

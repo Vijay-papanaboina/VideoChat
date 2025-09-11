@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, memo } from "react";
-import { Send, Smile, X, Users } from "lucide-react";
+import { Send, Smile, X, Users, Loader2 } from "lucide-react";
 import { useChatStore } from "../../stores/chatStore";
+import { chatAPI } from "../../utils/api";
 import EmojiPicker from "./EmojiPicker";
 import MessageList from "./MessageList";
 import TypingIndicator from "./TypingIndicator";
@@ -14,6 +15,8 @@ const Chat = memo(
     const [message, setMessage] = useState("");
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
+    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+    const [historyLoaded, setHistoryLoaded] = useState(false);
     const typingTimeoutRef = useRef(null);
     const messageInputRef = useRef(null);
 
@@ -24,13 +27,51 @@ const Chat = memo(
     // Get setChatOpen function directly from store to avoid hook re-renders
     const setChatOpen = useChatStore.getState().setChatOpen;
 
+    // Load chat history when component mounts
+    const loadChatHistory = useCallback(async () => {
+      if (!roomId || historyLoaded) return;
+
+      setIsLoadingHistory(true);
+      try {
+        console.log("📚 Loading chat history for room:", roomId);
+        const response = await chatAPI.getRecentMessages(roomId, 50);
+
+        if (response.success && response.data) {
+          console.log(
+            "✅ Chat history loaded:",
+            response.data.length,
+            "messages"
+          );
+          // Convert database messages to frontend format
+          const formattedMessages = response.data.map((msg) => ({
+            id: msg.id.toString(),
+            username: msg.username,
+            message: msg.message,
+            timestamp: msg.timestamp,
+            type: msg.messageType || "text",
+            roomId: msg.roomId,
+          }));
+          setMessages(formattedMessages);
+          setHistoryLoaded(true);
+        }
+      } catch (error) {
+        console.error("❌ Failed to load chat history:", error);
+        // Don't show error to user, just continue without history
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    }, [roomId, historyLoaded]);
+
     // Set current room when component mounts
     useEffect(() => {
       console.log("🏠 Chat component mounted for room:", roomId);
       console.log("🔌 Socket connected:", socketRef.current?.connected);
       console.log("🔌 Socket ID:", socketRef.current?.id);
       console.log("🔌 Socket rooms:", socketRef.current?.rooms);
-    }, [roomId, socketRef]);
+
+      // Load chat history when component mounts
+      loadChatHistory();
+    }, [roomId, socketRef, loadChatHistory]);
 
     // Socket event handlers
     const handleNewMessage = useCallback(
@@ -147,7 +188,7 @@ const Chat = memo(
       handleChatError,
     ]);
 
-    const handleSendMessage = (e) => {
+    const handleSendMessage = async (e) => {
       e.preventDefault();
       if (!message.trim() || !socketRef.current) return;
 
@@ -171,7 +212,7 @@ const Chat = memo(
       // Add message to local state for immediate display
       setMessages((prev) => [...prev, messageData]);
 
-      // Send message to other users via WebSocket
+      // Send message to other users via WebSocket (backend will save to database)
       socketRef.current.emit("chat-message", messageData);
 
       // Clear input and stop typing
@@ -252,8 +293,22 @@ const Chat = memo(
 
         {/* Messages */}
         <div className="flex-1 overflow-hidden">
-          <MessageList messages={currentMessages} currentUsername={username} />
-          <TypingIndicator typingUsers={currentTypingUsers} />
+          {isLoadingHistory ? (
+            <div className="flex-1 flex items-center justify-center p-4">
+              <div className="text-center text-gray-500 dark:text-gray-400">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                <p className="text-sm">Loading chat history...</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <MessageList
+                messages={currentMessages}
+                currentUsername={username}
+              />
+              <TypingIndicator typingUsers={currentTypingUsers} />
+            </>
+          )}
         </div>
 
         {/* Message Input */}
