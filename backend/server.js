@@ -46,7 +46,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
 
 // In-memory data stores for rooms and their users
-// rooms structure: { roomId: { password: "...", users: { socketId: "username", ... } } }
+// rooms structure: { roomId: { password: "...", users: { socketId: "username", ... }, screenSharing: { username: { isSharing: boolean } } } }
 const rooms = {};
 const MAX_USERS_PER_ROOM = 5; // Allow exactly 5 users (0-4 existing + 1 new = 5 total)
 
@@ -78,6 +78,7 @@ io.on("connection", (socket) => {
       rooms[roomId] = {
         password: password,
         users: {},
+        screenSharing: {},
         isActive: true,
       };
       console.log(`🚪 Room created in memory: ${roomId}`);
@@ -144,6 +145,18 @@ io.on("connection", (socket) => {
     // Send the list of other users to the new user
     socket.emit("all-users", otherUsers);
 
+    // Send current screen sharing state to the new user
+    if (
+      rooms[roomId].screenSharing &&
+      Object.keys(rooms[roomId].screenSharing).length > 0
+    ) {
+      console.log(
+        "📤 Sending screen sharing state to new user:",
+        rooms[roomId].screenSharing
+      );
+      socket.emit("initial-screen-sharing-state", rooms[roomId].screenSharing);
+    }
+
     // Notify all other users in the room that a new user has joined
     socket.to(roomId).emit("user-joined", { socketId: socket.id, username });
   });
@@ -173,9 +186,18 @@ io.on("connection", (socket) => {
     console.log(
       `📺 ${data.username} started screen sharing in room ${data.roomId}`
     );
+
+    // Update room's screen sharing state
+    if (rooms[data.roomId]) {
+      rooms[data.roomId].screenSharing[data.username] = { isSharing: true };
+    }
+
+    console.log(
+      "📤 Broadcasting user-screen-sharing event to room:",
+      data.roomId
+    );
     socket.to(data.roomId).emit("user-screen-sharing", {
       username: data.username,
-      shareType: data.shareType,
       isSharing: true,
     });
   });
@@ -183,6 +205,16 @@ io.on("connection", (socket) => {
   socket.on("screen-share-stopped", (data) => {
     console.log(
       `📺 ${data.username} stopped screen sharing in room ${data.roomId}`
+    );
+
+    // Update room's screen sharing state
+    if (rooms[data.roomId]) {
+      rooms[data.roomId].screenSharing[data.username] = { isSharing: false };
+    }
+
+    console.log(
+      "📤 Broadcasting user-screen-sharing event to room:",
+      data.roomId
     );
     socket.to(data.roomId).emit("user-screen-sharing", {
       username: data.username,
@@ -265,6 +297,22 @@ io.on("connection", (socket) => {
     for (const roomId in rooms) {
       if (rooms[roomId].users[socket.id]) {
         userRoomId = roomId;
+
+        // Get username before deleting user
+        const leavingUsername = rooms[roomId].users[socket.id]?.username;
+
+        // Clean up screen sharing state for the leaving user
+        if (
+          rooms[roomId].screenSharing &&
+          leavingUsername &&
+          rooms[roomId].screenSharing[leavingUsername]
+        ) {
+          delete rooms[roomId].screenSharing[leavingUsername];
+          console.log(
+            `🧹 Cleaned up screen sharing state for ${leavingUsername}`
+          );
+        }
+
         delete rooms[roomId].users[socket.id];
 
         // If the room becomes empty, completely destroy it

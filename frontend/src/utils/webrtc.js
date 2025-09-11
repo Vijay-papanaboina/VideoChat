@@ -74,7 +74,10 @@ export const createPeerConnection = (
   console.log(
     `Creating peer connection for ${targetSocketId}, isInitiator: ${isInitiator}`
   );
+
+  // Initialize deferred candidates array
   const pc = new RTCPeerConnection(ICE_SERVERS);
+  pc.deferredCandidates = [];
 
   // Configure codec preferences for better quality
   const transceivers = pc.getTransceivers();
@@ -194,27 +197,34 @@ export const createPeerConnection = (
     console.log(`Creating offer for ${targetSocketId}`);
     // Add a small delay to ensure the peer connection is fully set up
     setTimeout(() => {
-      pc.createOffer({
-        offerToReceiveAudio: true,
-        offerToReceiveVideo: true,
-        voiceActivityDetection: true,
-        iceRestart: false,
-      })
-        .then((offer) => {
-          console.log(`Setting local description for ${targetSocketId}`);
-          return pc.setLocalDescription(offer);
+      // Check if peer connection is still valid before creating offer
+      if (pc.connectionState === "new" || pc.connectionState === "connecting") {
+        pc.createOffer({
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: true,
+          voiceActivityDetection: true,
+          iceRestart: false,
         })
-        .then(() => {
-          console.log(`Sending offer to ${targetSocketId}`);
-          socketRef.current.emit("offer", {
-            target: targetSocketId,
-            caller: socketRef.current.id,
-            sdp: pc.localDescription,
+          .then((offer) => {
+            console.log(`Setting local description for ${targetSocketId}`);
+            return pc.setLocalDescription(offer);
+          })
+          .then(() => {
+            console.log(`Sending offer to ${targetSocketId}`);
+            socketRef.current.emit("offer", {
+              target: targetSocketId,
+              caller: socketRef.current.id,
+              sdp: pc.localDescription,
+            });
+          })
+          .catch((error) => {
+            console.error(`Error creating offer for ${targetSocketId}:`, error);
           });
-        })
-        .catch((error) => {
-          console.error(`Error creating offer for ${targetSocketId}:`, error);
-        });
+      } else {
+        console.log(
+          `Skipping offer creation for ${targetSocketId} - connection state: ${pc.connectionState}`
+        );
+      }
     }, 100);
   }
 

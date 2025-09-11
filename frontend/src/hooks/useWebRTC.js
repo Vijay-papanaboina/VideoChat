@@ -64,32 +64,66 @@ export const useWebRTC = (socketRef) => {
         return;
       }
 
-      pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
-        .then(() => {
-          console.log(
-            `Set remote description for ${payload.caller}, creating answer`
-          );
-          return pc.createAnswer({
-            voiceActivityDetection: true,
+      // Check if we can set remote description
+      if (
+        pc.signalingState === "stable" ||
+        pc.signalingState === "have-remote-offer"
+      ) {
+        console.log(
+          `Setting remote description for offer from ${payload.caller} (signaling state: ${pc.signalingState})`
+        );
+
+        pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
+          .then(() => {
+            console.log(
+              `Set remote description for ${payload.caller}, creating answer`
+            );
+
+            // Process any deferred ICE candidates
+            if (pc.deferredCandidates && pc.deferredCandidates.length > 0) {
+              console.log(
+                `Processing ${pc.deferredCandidates.length} deferred ICE candidates for ${payload.caller}`
+              );
+              const candidatePromises = pc.deferredCandidates.map((candidate) =>
+                pc.addIceCandidate(new RTCIceCandidate(candidate))
+              );
+              return Promise.all(candidatePromises).then(() => {
+                pc.deferredCandidates = [];
+                return pc.createAnswer({
+                  voiceActivityDetection: true,
+                });
+              });
+            } else {
+              return pc.createAnswer({
+                voiceActivityDetection: true,
+              });
+            }
+          })
+          .then((answer) => {
+            console.log(
+              `Created answer for ${payload.caller}, setting local description`
+            );
+            return pc.setLocalDescription(answer);
+          })
+          .then(() => {
+            console.log(`Sending answer to ${payload.caller}`);
+            socketRef.current.emit("answer", {
+              target: payload.caller,
+              callee: socketRef.current.id,
+              sdp: pc.localDescription,
+            });
+          })
+          .catch((error) => {
+            console.error(
+              `Error handling offer from ${payload.caller}:`,
+              error
+            );
           });
-        })
-        .then((answer) => {
-          console.log(
-            `Created answer for ${payload.caller}, setting local description`
-          );
-          return pc.setLocalDescription(answer);
-        })
-        .then(() => {
-          console.log(`Sending answer to ${payload.caller}`);
-          socketRef.current.emit("answer", {
-            target: payload.caller,
-            callee: socketRef.current.id,
-            sdp: pc.localDescription,
-          });
-        })
-        .catch((error) => {
-          console.error(`Error handling offer from ${payload.caller}:`, error);
-        });
+      } else {
+        console.log(
+          `Skipping offer from ${payload.caller} - signaling state: ${pc.signalingState}`
+        );
+      }
     },
     [socketRef]
   );
@@ -102,23 +136,64 @@ export const useWebRTC = (socketRef) => {
       return;
     }
 
-    pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
-      .then(() => {
-        console.log(`Set remote description for answer from ${payload.callee}`);
-      })
-      .catch((error) => {
-        console.error(`Error handling answer from ${payload.callee}:`, error);
-      });
+    // Check if we can set remote description
+    if (
+      pc.signalingState === "have-local-offer" ||
+      pc.signalingState === "stable"
+    ) {
+      console.log(
+        `Setting remote description for answer from ${payload.callee} (signaling state: ${pc.signalingState})`
+      );
+
+      pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
+        .then(() => {
+          console.log(
+            `Set remote description for answer from ${payload.callee}`
+          );
+
+          // Process any deferred ICE candidates
+          if (pc.deferredCandidates && pc.deferredCandidates.length > 0) {
+            console.log(
+              `Processing ${pc.deferredCandidates.length} deferred ICE candidates for ${payload.callee}`
+            );
+            const candidatePromises = pc.deferredCandidates.map((candidate) =>
+              pc.addIceCandidate(new RTCIceCandidate(candidate))
+            );
+            return Promise.all(candidatePromises).then(() => {
+              pc.deferredCandidates = [];
+            });
+          }
+        })
+        .catch((error) => {
+          console.error(`Error handling answer from ${payload.callee}:`, error);
+        });
+    } else {
+      console.log(
+        `Skipping answer from ${payload.callee} - signaling state: ${pc.signalingState}`
+      );
+    }
   }, []);
 
   const handleIceCandidate = useCallback((payload) => {
     const pc = peerConnectionsRef.current[payload.sender];
     if (pc && payload.candidate) {
-      pc.addIceCandidate(new RTCIceCandidate(payload.candidate)).catch(
-        (error) => {
-          console.error("Error adding ICE candidate:", error);
+      // Only add ICE candidate if remote description is set
+      if (pc.remoteDescription) {
+        pc.addIceCandidate(new RTCIceCandidate(payload.candidate)).catch(
+          (error) => {
+            console.error("Error adding ICE candidate:", error);
+          }
+        );
+      } else {
+        console.log(
+          `Deferring ICE candidate for ${payload.sender} - remote description not set yet`
+        );
+        // Store the candidate to add later when remote description is set
+        if (!pc.deferredCandidates) {
+          pc.deferredCandidates = [];
         }
-      );
+        pc.deferredCandidates.push(payload.candidate);
+      }
     }
   }, []);
 
@@ -150,6 +225,14 @@ export const useWebRTC = (socketRef) => {
   const setupSocketListeners = useCallback(() => {
     if (!socketRef.current) return;
 
+    // Remove existing listeners to prevent duplicates
+    socketRef.current.off("all-users");
+    socketRef.current.off("user-joined");
+    socketRef.current.off("offer");
+    socketRef.current.off("answer");
+    socketRef.current.off("ice-candidate");
+    socketRef.current.off("user-left");
+
     // Fired when the user successfully joins and receives a list of other users
     socketRef.current.on("all-users", (otherUsers) => {
       console.log("All other users in room:", otherUsers);
@@ -167,15 +250,17 @@ export const useWebRTC = (socketRef) => {
           [socketId]: username,
         }));
 
-        // For each existing user, create a new peer connection
-        const pc = createPeerConnection(
-          socketId,
-          true,
-          localStreamRef,
-          socketRef,
-          setRemoteStreams
-        );
-        peerConnectionsRef.current[socketId] = pc;
+        // Only create peer connection if it doesn't already exist
+        if (!peerConnectionsRef.current[socketId]) {
+          const pc = createPeerConnection(
+            socketId,
+            true,
+            localStreamRef,
+            socketRef,
+            setRemoteStreams
+          );
+          peerConnectionsRef.current[socketId] = pc;
+        }
       });
     });
 
@@ -187,15 +272,18 @@ export const useWebRTC = (socketRef) => {
         ...prev,
         [payload.socketId]: payload.username,
       }));
-      // Create a peer connection for the new user (but don't initiate the call)
-      const pc = createPeerConnection(
-        payload.socketId,
-        false,
-        localStreamRef,
-        socketRef,
-        setRemoteStreams
-      );
-      peerConnectionsRef.current[payload.socketId] = pc;
+
+      // Only create peer connection if it doesn't already exist
+      if (!peerConnectionsRef.current[payload.socketId]) {
+        const pc = createPeerConnection(
+          payload.socketId,
+          false,
+          localStreamRef,
+          socketRef,
+          setRemoteStreams
+        );
+        peerConnectionsRef.current[payload.socketId] = pc;
+      }
 
       // The new user will initiate the connection, so we wait for their offer
     });
@@ -222,6 +310,16 @@ export const useWebRTC = (socketRef) => {
   // Cleanup function
   const cleanup = useCallback(() => {
     console.log("Cleaning up WebRTC");
+
+    // Remove socket event listeners
+    if (socketRef.current) {
+      socketRef.current.off("all-users");
+      socketRef.current.off("user-joined");
+      socketRef.current.off("offer");
+      socketRef.current.off("answer");
+      socketRef.current.off("ice-candidate");
+      socketRef.current.off("user-left");
+    }
 
     // Stop all media tracks
     if (localStreamRef.current) {
@@ -261,7 +359,7 @@ export const useWebRTC = (socketRef) => {
     peerConnectionsRef.current = {};
 
     console.log("WebRTC cleanup completed");
-  }, []);
+  }, [socketRef]);
 
   return {
     localStreamRef,

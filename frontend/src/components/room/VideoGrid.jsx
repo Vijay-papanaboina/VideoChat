@@ -38,8 +38,12 @@ const VideoGrid = ({
                 video.srcObject = localStreamRef.current;
               }
             }}
-            className="w-full h-full object-cover rounded-lg border-2 border-white shadow-lg"
-            style={{ transform: "scaleX(-1)" }} // Mirror effect
+            className={`w-full h-full ${
+              isScreenSharing ? "object-contain" : "object-cover"
+            } rounded-lg border-2 border-white shadow-lg`}
+            style={
+              isScreenSharing ? {} : { transform: "scaleX(-1)" } // Mirror effect for camera
+            }
             onLoadedMetadata={() => {}}
             onCanPlay={() => {}}
           />
@@ -108,8 +112,12 @@ const VideoGrid = ({
                             video.srcObject = localStreamRef.current;
                           }
                         }}
-                        className="w-full h-full object-cover rounded-lg border-2 border-white shadow-lg"
-                        style={{ transform: "scaleX(-1)" }}
+                        className={`w-full h-full ${
+                          isScreenSharing ? "object-contain" : "object-cover"
+                        } rounded-lg border-2 border-white shadow-lg`}
+                        style={
+                          isScreenSharing ? {} : { transform: "scaleX(-1)" }
+                        }
                       />
                       <div className="absolute bottom-4 left-4 bg-black bg-opacity-70 text-white px-3 py-2 rounded text-lg font-medium">
                         {username} (You) - FOCUSED
@@ -126,11 +134,24 @@ const VideoGrid = ({
                             video.srcObject = focusedStreamData.stream;
                           }
                         }}
-                        className="w-full h-full object-cover rounded-lg border-2 border-white shadow-lg"
+                        className={`w-full h-full ${
+                          remoteScreenSharing[focusedStreamData?.username]
+                            ?.isSharing
+                            ? "object-contain"
+                            : "object-cover"
+                        }`}
                       />
                       <div className="absolute bottom-4 left-4 bg-black bg-opacity-70 text-white px-3 py-2 rounded text-lg font-medium">
                         {focusedStreamData?.username} - FOCUSED
                       </div>
+                      {/* Screen sharing indicator for focused remote stream */}
+                      {remoteScreenSharing[focusedStreamData?.username]
+                        ?.isSharing && (
+                        <div className="absolute top-4 left-4 bg-green-600 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2">
+                          <Monitor className="w-4 h-4" />
+                          Screen Sharing
+                        </div>
+                      )}
                     </>
                   )}
                   <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs sm:text-xs md:text-sm">
@@ -166,23 +187,33 @@ const VideoGrid = ({
                               }
                             }
                           }}
-                          className="w-full h-full object-cover rounded-lg"
+                          className={`w-full h-full ${
+                            type === "local"
+                              ? isScreenSharing
+                                ? "object-contain"
+                                : "object-cover"
+                              : remoteScreenSharing[remoteUsername]?.isSharing
+                              ? "object-contain"
+                              : "object-cover"
+                          } rounded-lg`}
                           style={
-                            type === "local" ? { transform: "scaleX(-1)" } : {}
+                            type === "local" && !isScreenSharing
+                              ? { transform: "scaleX(-1)" }
+                              : {}
                           }
                         />
                         <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-sm font-medium">
                           {remoteUsername} {type === "local" ? "(You)" : ""}
                         </div>
-                        {/* Screen sharing indicator for remote users */}
-                        {type !== "local" &&
-                          remoteScreenSharing[remoteUsername]?.isSharing && (
-                            <div className="absolute top-2 left-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
-                              <Monitor className="w-3 h-3" />
-                              {remoteScreenSharing[remoteUsername].shareType ||
-                                "Screen"}
-                            </div>
-                          )}
+                        {/* Screen sharing indicator */}
+                        {(type === "local" && isScreenSharing) ||
+                        (type !== "local" &&
+                          remoteScreenSharing[remoteUsername]?.isSharing) ? (
+                          <div className="absolute top-2 left-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
+                            <Monitor className="w-3 h-3" />
+                            Screen
+                          </div>
+                        ) : null}
                       </div>
                     )
                   )}
@@ -206,7 +237,11 @@ const VideoGrid = ({
                         video.srcObject = stream;
                       }
                     }}
-                    className="w-full h-full object-cover rounded-lg"
+                    className={`w-full h-full ${
+                      remoteScreenSharing[remoteUsername]?.isSharing
+                        ? "object-contain"
+                        : "object-cover"
+                    } rounded-lg`}
                     onLoadedMetadata={() => {}}
                     onCanPlay={() => {}}
                     onError={(e) => {
@@ -221,8 +256,7 @@ const VideoGrid = ({
                   {remoteScreenSharing[remoteUsername]?.isSharing && (
                     <div className="absolute top-2 left-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
                       <Monitor className="w-3 h-3" />
-                      {remoteScreenSharing[remoteUsername].shareType ||
-                        "Screen"}
+                      Screen
                     </div>
                   )}
                   {/* Click to focus indicator */}

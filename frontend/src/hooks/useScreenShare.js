@@ -1,12 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 
 /**
- * Custom hook for managing screen sharing functionality
- * @param {Object} socketRef - Socket.IO reference
- * @param {string} roomId - Current room ID
- * @param {string} username - Current username
- * @param {Object} peerConnectionsRef - WebRTC peer connections reference
- * @param {Object} localStreamRef - Local media stream reference
+ * Simple screen sharing hook - just replaces tracks, no SDP renegotiation
  */
 export const useScreenShare = (
   socketRef,
@@ -14,260 +9,260 @@ export const useScreenShare = (
   username,
   peerConnectionsRef,
   localStreamRef,
-  isVideoMuted = false
+  socketReady = false
 ) => {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [screenStream, setScreenStream] = useState(null);
-  const [screenShareType, setScreenShareType] = useState(null);
   const [isScreenShareSupported, setIsScreenShareSupported] = useState(false);
   const [remoteScreenSharing, setRemoteScreenSharing] = useState({});
 
-  // Create a blank video track for when video is muted
-  const createBlankVideoTrack = () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 1920;
-    canvas.height = 1080;
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    const stream = canvas.captureStream(30);
-    return stream.getVideoTracks()[0];
-  };
-
   // Check screen sharing support
   useEffect(() => {
-    const checkScreenShareSupport = () => {
-      if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
-        setIsScreenShareSupported(true);
-        console.log("Screen sharing is supported");
-      } else {
-        setIsScreenShareSupported(false);
-        console.log("Screen sharing is not supported");
-      }
-    };
-    checkScreenShareSupport();
+    setIsScreenShareSupported(
+      !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia)
+    );
   }, []);
 
   // Listen for remote screen sharing events
   useEffect(() => {
+    if (!socketReady) {
+      return;
+    }
+
     const socket = socketRef.current;
-    if (!socket) return;
+    if (!socket) {
+      return;
+    }
 
     const handleUserScreenSharing = (data) => {
-      console.log(`${data.username} screen sharing: ${data.isSharing}`);
-      setRemoteScreenSharing((prev) => ({
-        ...prev,
-        [data.username]: {
-          isSharing: data.isSharing,
-          shareType: data.shareType || null,
-        },
-      }));
+      console.log("📺 Received screen sharing event:", data);
+      setRemoteScreenSharing((prev) => {
+        const newState = {
+          ...prev,
+          [data.username]: {
+            isSharing: data.isSharing,
+          },
+        };
+        return newState;
+      });
+    };
+
+    const handleInitialScreenSharingState = (screenSharingState) => {
+      console.log(
+        "📺 Received initial screen sharing state:",
+        screenSharingState
+      );
+      setRemoteScreenSharing(screenSharingState);
     };
 
     socket.on("user-screen-sharing", handleUserScreenSharing);
+    socket.on("initial-screen-sharing-state", handleInitialScreenSharingState);
 
     return () => {
       socket.off("user-screen-sharing", handleUserScreenSharing);
+      socket.off(
+        "initial-screen-sharing-state",
+        handleInitialScreenSharingState
+      );
     };
-  }, [socketRef]);
+  }, [socketRef, socketReady]);
 
-  const startScreenShare = async () => {
-    try {
-      console.log("Starting screen share");
-
-      // Let browser handle the selection, just provide basic constraints
-      const constraints = {
-        video: {
-          cursor: "always", // Show cursor
-          width: { ideal: 1920, max: 1920 },
-          height: { ideal: 1080, max: 1080 },
-          frameRate: { ideal: 30, max: 60 },
-        },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      };
-
-      const stream = await navigator.mediaDevices.getDisplayMedia(constraints);
-
-      // Store the screen stream
-      setScreenStream(stream);
-      setIsScreenSharing(true);
-      setScreenShareType("screen"); // Default to "screen" since browser handles selection
-
-      console.log("Screen sharing started:", stream);
-
-      // Replace video track in all peer connections
-      const videoTrack = stream.getVideoTracks()[0];
-      if (videoTrack) {
-        // If video is muted, create a blank video track
-        const trackToSend = isVideoMuted ? createBlankVideoTrack() : videoTrack;
-
-        Object.values(peerConnectionsRef.current).forEach((pc) => {
+  // Simple function to replace video track in all peer connections
+  const replaceVideoTrack = useCallback(
+    (newTrack) => {
+      Object.values(peerConnectionsRef.current).forEach((pc) => {
+        if (
+          pc.connectionState === "connected" ||
+          pc.connectionState === "connecting"
+        ) {
           const sender = pc
             .getSenders()
             .find((s) => s.track && s.track.kind === "video");
-          if (sender) {
-            sender.replaceTrack(trackToSend);
-            console.log(
-              `Replaced video track in peer connection (muted: ${isVideoMuted})`
-            );
+          if (sender && newTrack) {
+            sender.replaceTrack(newTrack).catch((error) => {
+              console.error("Error replacing video track:", error);
+            });
           }
-        });
+        }
+      });
+    },
+    [peerConnectionsRef]
+  );
+
+  const startScreenShare = useCallback(async () => {
+    try {
+      console.log("Starting screen share");
+
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true,
+      });
+
+      setScreenStream(stream);
+      setIsScreenSharing(true);
+
+      // Create a new stream that combines screen share video with original audio
+      const newStream = new MediaStream();
+
+      // Add screen share video track
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        newStream.addTrack(videoTrack);
       }
 
-      // Handle screen share end
-      stream.getVideoTracks()[0].onended = () => {
+      // Add original audio track (if available)
+      if (localStreamRef.current) {
+        const audioTrack = localStreamRef.current.getAudioTracks()[0];
+        if (audioTrack) {
+          newStream.addTrack(audioTrack);
+        }
+      }
+
+      // Update the local stream reference to use the screen sharing stream
+      localStreamRef.current = newStream;
+
+      // Replace video track in existing peer connections
+      if (videoTrack) {
+        replaceVideoTrack(videoTrack);
+      }
+
+      // Handle when user stops screen sharing from browser UI
+      stream.getVideoTracks()[0].onended = async () => {
         console.log("Screen sharing ended by user");
-        stopScreenShare();
+        // Stop screen stream
+        stream.getTracks().forEach((track) => track.stop());
+        setScreenStream(null);
+        setIsScreenSharing(false);
+
+        // Restore original camera stream
+        try {
+          const cameraStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              width: { ideal: 1920, max: 1920 },
+              height: { ideal: 1080, max: 1080 },
+              frameRate: { ideal: 30, max: 60 },
+              facingMode: "user",
+            },
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              sampleRate: 48000,
+              channelCount: 2,
+            },
+          });
+
+          // Update localStreamRef to use the fresh camera stream
+          localStreamRef.current = cameraStream;
+
+          // Replace video track in existing peer connections
+          const cameraTrack = cameraStream.getVideoTracks()[0];
+          if (cameraTrack) {
+            replaceVideoTrack(cameraTrack);
+          }
+        } catch (error) {
+          console.error("Error getting camera stream:", error);
+        }
+
+        // Notify other users
+        if (socketRef.current) {
+          socketRef.current.emit("screen-share-stopped", { roomId, username });
+        }
       };
 
-      // Notify other users about screen sharing
-      socketRef.current.emit("screen-share-started", {
-        roomId,
-        shareType: "screen", // Default to "screen" since browser handles selection
-        username,
-      });
+      // Notify other users
+      if (socketRef.current) {
+        socketRef.current.emit("screen-share-started", { roomId, username });
+      }
     } catch (error) {
       console.error("Error starting screen share:", error);
       alert("Failed to start screen sharing. Please try again.");
     }
-  };
+  }, [socketRef, roomId, username, replaceVideoTrack, localStreamRef]);
 
-  const stopScreenShare = useCallback(() => {
+  const stopScreenShare = useCallback(async () => {
     try {
       console.log("Stopping screen share");
 
-      // Stop the screen stream
+      // Stop screen stream
       if (screenStream) {
-        screenStream.getTracks().forEach((track) => {
-          console.log("Stopping screen track:", track.kind);
-          track.stop();
-        });
+        screenStream.getTracks().forEach((track) => track.stop());
         setScreenStream(null);
       }
 
       setIsScreenSharing(false);
-      setScreenShareType(null);
 
-      // Restore camera video track
-      if (localStreamRef.current) {
-        const videoTrack = localStreamRef.current.getVideoTracks()[0];
-        if (videoTrack) {
-          Object.values(peerConnectionsRef.current).forEach((pc) => {
-            const sender = pc
-              .getSenders()
-              .find((s) => s.track && s.track.kind === "video");
-            if (sender) {
-              sender.replaceTrack(videoTrack);
-              console.log("Restored camera video track");
-            }
-          });
+      // Restore original camera stream
+      // We need to get a fresh camera stream since we replaced localStreamRef.current
+      try {
+        const cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 1920, max: 1920 },
+            height: { ideal: 1080, max: 1080 },
+            frameRate: { ideal: 30, max: 60 },
+            facingMode: "user",
+          },
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 48000,
+            channelCount: 2,
+          },
+        });
+
+        // Update localStreamRef to use the fresh camera stream
+        localStreamRef.current = cameraStream;
+
+        // Replace video track in existing peer connections
+        const cameraTrack = cameraStream.getVideoTracks()[0];
+        if (cameraTrack) {
+          replaceVideoTrack(cameraTrack);
         }
+      } catch (error) {
+        console.error("Error getting camera stream:", error);
       }
 
       // Notify other users
-      socketRef.current.emit("screen-share-stopped", { roomId, username });
+      if (socketRef.current) {
+        socketRef.current.emit("screen-share-stopped", { roomId, username });
+      }
     } catch (error) {
       console.error("Error stopping screen share:", error);
     }
   }, [
     screenStream,
     localStreamRef,
-    peerConnectionsRef,
     socketRef,
     roomId,
     username,
+    replaceVideoTrack,
   ]);
 
-  const toggleScreenShare = () => {
+  const toggleScreenShare = useCallback(() => {
     if (isScreenSharing) {
       stopScreenShare();
     } else {
       startScreenShare();
     }
-  };
-
-  // Handle video mute changes during screen sharing
-  const handleVideoMuteChange = useCallback(
-    (videoMuted) => {
-      if (isScreenSharing && screenStream) {
-        const videoTrack = screenStream.getVideoTracks()[0];
-        if (videoTrack) {
-          const trackToSend = videoMuted ? createBlankVideoTrack() : videoTrack;
-
-          Object.values(peerConnectionsRef.current).forEach((pc) => {
-            const sender = pc
-              .getSenders()
-              .find((s) => s.track && s.track.kind === "video");
-            if (sender) {
-              sender.replaceTrack(trackToSend);
-              console.log(
-                `Updated video track for screen share (muted: ${videoMuted})`
-              );
-            }
-          });
-        }
-      }
-    },
-    [isScreenSharing, screenStream, peerConnectionsRef]
-  );
-
-  // Expose the function to be called externally when video mute state changes
-  const updateVideoMuteState = useCallback(
-    (videoMuted) => {
-      handleVideoMuteChange(videoMuted);
-    },
-    [handleVideoMuteChange]
-  );
-
-  // Cleanup function
-  const cleanup = useCallback(() => {
-    console.log("Cleaning up screen share");
-
-    // Force stop screen share if active
-    if (isScreenSharing) {
-      console.log("Force stopping screen share during cleanup");
-      stopScreenShare();
-    }
-
-    // Additional cleanup for screen stream
-    if (screenStream) {
-      console.log("Stopping screen stream tracks during cleanup");
-      screenStream.getTracks().forEach((track) => {
-        console.log("Stopping screen track:", track.kind, track.label);
-        track.stop();
-      });
-    }
-
-    // Reset all screen share state
-    setScreenStream(null);
-    setIsScreenSharing(false);
-    setScreenShareType(null);
-
-    console.log("Screen share cleanup completed");
-  }, [stopScreenShare, isScreenSharing, screenStream]);
+  }, [isScreenSharing, startScreenShare, stopScreenShare]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      cleanup();
+      if (screenStream) {
+        screenStream.getTracks().forEach((track) => track.stop());
+      }
     };
-  }, [cleanup]);
+  }, [screenStream]);
 
   return {
     isScreenSharing,
     screenStream,
-    screenShareType,
     isScreenShareSupported,
     remoteScreenSharing,
     startScreenShare,
     stopScreenShare,
     toggleScreenShare,
-    updateVideoMuteState,
-    cleanup,
   };
 };

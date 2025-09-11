@@ -50,11 +50,14 @@ const RoomPage = () => {
   // Hook 7: useState - focused stream state
   const [focusedStream, setFocusedStream] = useState(null);
 
+  // Hook 8: useState - socket ready state
+  const [socketReady, setSocketReady] = useState(false);
+
   // Get user details from navigation state
   const username = location.state?.username;
   const password = location.state?.password;
 
-  // Hook 8: useWebRTC - WebRTC functionality (contains multiple internal hooks)
+  // Hook 9: useWebRTC - WebRTC functionality (contains multiple internal hooks)
   const {
     localStreamRef,
     peerConnectionsRef,
@@ -66,7 +69,7 @@ const RoomPage = () => {
     cleanup,
   } = useWebRTC(socketRef);
 
-  // Hook 9: useCallback - force stop all media tracks function
+  // Hook 10: useCallback - force stop all media tracks function
   const forceStopAllTracks = useCallback(() => {
     console.log("Force stopping all media tracks from RoomPage");
     if (localStreamRef.current) {
@@ -97,36 +100,35 @@ const RoomPage = () => {
     }
   }, [localStreamRef]);
 
-  // Hook 10: useChatActions - chat action functions
+  // Hook 11: useChatActions - chat action functions
   const { toggleChat } = useChatActions();
 
-  // Hook 11: useChatStore - chat state (only isChatOpen)
+  // Hook 12: useChatStore - chat state (only isChatOpen)
   const isChatOpen = useChatStore((state) => state.isChatOpen);
 
-  // Hook 12: useScreenShare - screen sharing functionality (contains multiple internal hooks)
+  // Hook 13: useScreenShare - screen sharing functionality (contains multiple internal hooks)
   const {
     isScreenSharing,
     isScreenShareSupported,
-    screenShareType,
     remoteScreenSharing,
     toggleScreenShare,
-    cleanup: cleanupScreenShare,
   } = useScreenShare(
     socketRef,
     roomId,
     username,
     peerConnectionsRef,
-    localStreamRef
+    localStreamRef,
+    socketReady
   );
 
-  // Hook 13: useEffect - check credentials and show prompt
+  // Hook 14: useEffect - check credentials and show prompt
   useEffect(() => {
     if (!username || !password) {
       setShowCredentialPrompt(true);
     }
   }, [username, password]);
 
-  // Hook 14: useEffect - main room setup effect
+  // Hook 16: useEffect - main room setup effect
   useEffect(() => {
     console.log("useEffect running - checking credentials");
     // Only proceed if credentials are available
@@ -166,6 +168,11 @@ const RoomPage = () => {
     const serverUrl =
       import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
     socketRef.current = io(serverUrl);
+
+    // Wait for socket to connect before setting ready
+    socketRef.current.on("connect", () => {
+      setSocketReady(true);
+    });
 
     // Initialize local stream and setup
     initializeLocalStream()
@@ -229,15 +236,17 @@ const RoomPage = () => {
         });
       }
 
-      // Cleanup WebRTC and screen share
+      // Cleanup WebRTC
       cleanup();
-      cleanupScreenShare();
 
       // Disconnect the socket
       if (socketRef.current) {
         console.log("Unmount cleanup: disconnecting socket");
         socketRef.current.disconnect();
       }
+
+      // Reset socket ready state
+      setSocketReady(false);
 
       console.log("Unmount cleanup completed");
     };
@@ -249,11 +258,11 @@ const RoomPage = () => {
     initializeLocalStream,
     setupSocketListeners,
     cleanup,
-    cleanupScreenShare,
     isAuthenticated,
     user?.id,
     localStreamRef,
     forceStopAllTracks,
+    setSocketReady,
   ]);
 
   // Hook 15: useCallback - stream click handlers (memoized to prevent re-renders)
@@ -306,9 +315,6 @@ const RoomPage = () => {
 
     // Cleanup WebRTC connections
     cleanup();
-
-    // Cleanup screen share
-    cleanupScreenShare();
 
     // Disconnect the socket
     if (socketRef.current) {
@@ -427,7 +433,7 @@ const RoomPage = () => {
           {isScreenSharing && (
             <div className="absolute top-2 left-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
               <Monitor className="w-3 h-3" />
-              {screenShareType || "Screen"}
+              Screen
             </div>
           )}
           {/* Click to focus indicator */}
@@ -445,7 +451,6 @@ const RoomPage = () => {
     localStreamRef,
     username,
     isScreenSharing,
-    screenShareType,
     handleStreamClick,
   ]);
 
