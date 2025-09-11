@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import io from "socket.io-client";
-import { Monitor } from "lucide-react";
+import { Monitor, Maximize2 } from "lucide-react";
 
 // Import custom hooks
 import { useWebRTC } from "../hooks/useWebRTC";
@@ -50,14 +50,17 @@ const RoomPage = () => {
   // Hook 7: useState - focused stream state
   const [focusedStream, setFocusedStream] = useState(null);
 
-  // Hook 8: useState - socket ready state
+  // Hook 8: useState - fullscreen stream state
+  const [fullscreenStream, setFullscreenStream] = useState(null);
+
+  // Hook 9: useState - socket ready state
   const [socketReady, setSocketReady] = useState(false);
 
   // Get user details from navigation state
   const username = location.state?.username;
   const password = location.state?.password;
 
-  // Hook 9: useWebRTC - WebRTC functionality (contains multiple internal hooks)
+  // Hook 10: useWebRTC - WebRTC functionality (contains multiple internal hooks)
   const {
     localStreamRef,
     peerConnectionsRef,
@@ -69,7 +72,7 @@ const RoomPage = () => {
     cleanup,
   } = useWebRTC(socketRef);
 
-  // Hook 10: useCallback - force stop all media tracks function
+  // Hook 11: useCallback - force stop all media tracks function
   const forceStopAllTracks = useCallback(() => {
     console.log("Force stopping all media tracks from RoomPage");
     if (localStreamRef.current) {
@@ -100,13 +103,13 @@ const RoomPage = () => {
     }
   }, [localStreamRef]);
 
-  // Hook 11: useChatActions - chat action functions
+  // Hook 12: useChatActions - chat action functions
   const { toggleChat } = useChatActions();
 
-  // Hook 12: useChatStore - chat state (only isChatOpen)
+  // Hook 13: useChatStore - chat state (only isChatOpen)
   const isChatOpen = useChatStore((state) => state.isChatOpen);
 
-  // Hook 13: useScreenShare - screen sharing functionality (contains multiple internal hooks)
+  // Hook 14: useScreenShare - screen sharing functionality (contains multiple internal hooks)
   const {
     isScreenSharing,
     isScreenShareSupported,
@@ -121,7 +124,7 @@ const RoomPage = () => {
     socketReady
   );
 
-  // Hook 14: useEffect - check credentials and show prompt
+  // Hook 15: useEffect - check credentials and show prompt
   useEffect(() => {
     if (!username || !password) {
       setShowCredentialPrompt(true);
@@ -279,6 +282,20 @@ const RoomPage = () => {
     [focusedStream]
   );
 
+  // Hook 16: useCallback - fullscreen click handler
+  const handleFullscreenClick = useCallback(
+    (streamType, socketId = null) => {
+      if (fullscreenStream === (streamType === "local" ? "local" : socketId)) {
+        // If clicking the same stream, exit fullscreen
+        setFullscreenStream(null);
+      } else {
+        // Enter fullscreen for the clicked stream
+        setFullscreenStream(streamType === "local" ? "local" : socketId);
+      }
+    },
+    [fullscreenStream]
+  );
+
   const leaveRoom = () => {
     console.log("Leaving room - starting AGGRESSIVE cleanup");
 
@@ -370,7 +387,7 @@ const RoomPage = () => {
   const isFocused = focusedStream !== null;
   const gridClass = getLayoutClasses(remoteStreamsArray.length, isFocused);
 
-  // Hook 16: useMemo - VideoGrid (memoized to prevent re-renders on chat state changes)
+  // Hook 17: useMemo - VideoGrid (memoized to prevent re-renders on chat state changes)
   const memoizedVideoGrid = useMemo(
     () => (
       <VideoGrid
@@ -381,7 +398,9 @@ const RoomPage = () => {
         isScreenSharing={isScreenSharing}
         remoteScreenSharing={remoteScreenSharing}
         focusedStream={focusedStream}
+        fullscreenStream={fullscreenStream}
         onStreamClick={handleStreamClick}
+        onFullscreenClick={handleFullscreenClick}
         gridClass={gridClass}
       />
     ),
@@ -393,12 +412,14 @@ const RoomPage = () => {
       isScreenSharing,
       remoteScreenSharing,
       focusedStream,
+      fullscreenStream,
       handleStreamClick,
+      handleFullscreenClick,
       gridClass,
     ]
   );
 
-  // Hook 17: useMemo - local video corner (memoized to prevent re-renders)
+  // Hook 18: useMemo - local video corner (memoized to prevent re-renders)
   const memoizedLocalVideoCorner = useMemo(() => {
     if (remoteStreamsArray.length === 0 || isFocused) return null;
 
@@ -436,8 +457,18 @@ const RoomPage = () => {
               Screen
             </div>
           )}
+          {/* Fullscreen button */}
+          <div
+            className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-1 py-1 rounded text-xs cursor-pointer hover:bg-opacity-70 transition-all duration-200"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleFullscreenClick("local");
+            }}
+          >
+            <Maximize2 className="w-3 h-3" />
+          </div>
           {/* Click to focus indicator */}
-          <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-1 py-1 rounded text-xs sm:text-xs md:text-sm">
+          <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white px-1 py-1 rounded text-xs sm:text-xs md:text-sm">
             <span className="hidden sm:inline">Click to focus</span>
             <span className="sm:hidden">Tap to focus</span>
           </div>
@@ -452,6 +483,7 @@ const RoomPage = () => {
     username,
     isScreenSharing,
     handleStreamClick,
+    handleFullscreenClick,
   ]);
 
   // Chat sidebar - now isolated from video re-renders

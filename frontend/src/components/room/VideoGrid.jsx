@@ -1,4 +1,4 @@
-import { Monitor } from "lucide-react";
+import { Monitor, Maximize2, Minimize2 } from "lucide-react";
 
 /**
  * VideoGrid Component
@@ -13,9 +13,89 @@ const VideoGrid = ({
   isScreenSharing,
   remoteScreenSharing,
   focusedStream,
+  fullscreenStream,
   onStreamClick,
+  onFullscreenClick,
   gridClass,
 }) => {
+  // Handle fullscreen mode
+  if (fullscreenStream) {
+    const fullscreenStreamData =
+      fullscreenStream === "local"
+        ? { type: "local", username: username }
+        : remoteStreamsArray.find((s) => s.socketId === fullscreenStream);
+
+    return (
+      <div className="relative w-full h-full bg-black">
+        {fullscreenStream === "local" ? (
+          // Local stream fullscreen
+          <>
+            <video
+              key="local-video-fullscreen"
+              autoPlay
+              playsInline
+              muted
+              ref={(video) => {
+                if (video && localStreamRef.current) {
+                  video.srcObject = localStreamRef.current;
+                }
+              }}
+              className={`w-full h-full ${
+                isScreenSharing ? "object-contain" : "object-cover"
+              }`}
+              style={isScreenSharing ? {} : { transform: "scaleX(-1)" }}
+            />
+            <div className="absolute bottom-4 left-4 bg-black bg-opacity-70 text-white px-3 py-2 rounded text-lg font-medium">
+              {username} (You) - FULLSCREEN
+            </div>
+            {/* Screen sharing indicator */}
+            {isScreenSharing && (
+              <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2">
+                <Monitor className="w-4 h-4" />
+                Screen Sharing
+              </div>
+            )}
+          </>
+        ) : (
+          // Remote stream fullscreen
+          <>
+            <video
+              autoPlay
+              playsInline
+              ref={(video) => {
+                if (video && fullscreenStreamData?.stream) {
+                  video.srcObject = fullscreenStreamData.stream;
+                }
+              }}
+              className={`w-full h-full ${
+                remoteScreenSharing[fullscreenStreamData?.username]?.isSharing
+                  ? "object-contain"
+                  : "object-cover"
+              }`}
+            />
+            <div className="absolute bottom-4 left-4 bg-black bg-opacity-70 text-white px-3 py-2 rounded text-lg font-medium">
+              {fullscreenStreamData?.username} - FULLSCREEN
+            </div>
+            {/* Screen sharing indicator */}
+            {remoteScreenSharing[fullscreenStreamData?.username]?.isSharing && (
+              <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2">
+                <Monitor className="w-4 h-4" />
+                Screen Sharing
+              </div>
+            )}
+          </>
+        )}
+        {/* Exit fullscreen button */}
+        <div
+          className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs cursor-pointer hover:bg-opacity-70 transition-all duration-200"
+          onClick={() => onFullscreenClick(null)}
+        >
+          <Minimize2 className="w-4 h-4" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`grid w-full h-full gap-2 p-2 ${gridClass}`}>
       {remoteStreamsArray.length === 0 ? (
@@ -58,8 +138,18 @@ const VideoGrid = ({
               Screen Sharing
             </div>
           )}
+          {/* Fullscreen button */}
+          <div
+            className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs sm:text-xs md:text-sm cursor-pointer hover:bg-opacity-70 transition-all duration-200"
+            onClick={(e) => {
+              e.stopPropagation();
+              onFullscreenClick("local");
+            }}
+          >
+            <Maximize2 className="w-3 h-3" />
+          </div>
           {/* Click to focus indicator */}
-          <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs sm:text-xs md:text-sm">
+          <div className="absolute top-4 left-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs sm:text-xs md:text-sm">
             <span className="hidden sm:inline">Click to focus</span>
             <span className="sm:hidden">Tap to focus</span>
           </div>
@@ -154,7 +244,20 @@ const VideoGrid = ({
                       )}
                     </>
                   )}
-                  <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs sm:text-xs md:text-sm">
+                  {/* Fullscreen button */}
+                  <div
+                    className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs sm:text-xs md:text-sm cursor-pointer hover:bg-opacity-70 transition-all duration-200"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onFullscreenClick(
+                        focusedStream === "local" ? "local" : focusedStream
+                      );
+                    }}
+                  >
+                    <Maximize2 className="w-3 h-3" />
+                  </div>
+                  {/* Click to unfocus indicator */}
+                  <div className="absolute top-4 left-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs sm:text-xs md:text-sm">
                     <span className="hidden sm:inline">Click to unfocus</span>
                     <span className="sm:hidden">Tap to unfocus</span>
                   </div>
@@ -214,6 +317,19 @@ const VideoGrid = ({
                             Screen
                           </div>
                         ) : null}
+                        {/* Fullscreen button */}
+                        <div
+                          className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-1 py-1 rounded text-xs cursor-pointer hover:bg-opacity-70 transition-all duration-200"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onFullscreenClick(
+                              type === "local" ? "local" : "remote",
+                              socketId
+                            );
+                          }}
+                        >
+                          <Maximize2 className="w-3 h-3" />
+                        </div>
                       </div>
                     )
                   )}
@@ -259,8 +375,18 @@ const VideoGrid = ({
                       Screen
                     </div>
                   )}
+                  {/* Fullscreen button */}
+                  <div
+                    className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-1 py-1 rounded text-xs cursor-pointer hover:bg-opacity-70 transition-all duration-200"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onFullscreenClick("remote", socketId);
+                    }}
+                  >
+                    <Maximize2 className="w-3 h-3" />
+                  </div>
                   {/* Click to focus indicator */}
-                  <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-1 py-1 rounded text-xs sm:text-xs md:text-sm">
+                  <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white px-1 py-1 rounded text-xs sm:text-xs md:text-sm">
                     <span className="hidden sm:inline">Click to focus</span>
                     <span className="sm:hidden">Tap to focus</span>
                   </div>
