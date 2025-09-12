@@ -460,60 +460,75 @@ const VideoGrid = ({
             );
           } else {
             // Normal layout - show all remote streams
-            return remoteStreamsArray.map(
-              ({ socketId, stream, username: remoteUsername }) => (
-                <div
-                  key={socketId}
-                  className="relative w-full h-full cursor-pointer transition-all duration-300 hover:ring-2 hover:ring-blue-300 touch-manipulation active:ring-2 active:ring-blue-400"
-                  onClick={() => onStreamClick("remote", socketId)}
-                >
-                  <video
-                    autoPlay
-                    playsInline
-                    ref={(video) => {
-                      if (video && stream) {
-                        video.srcObject = stream;
-                      }
-                    }}
-                    className={`w-full h-full ${
-                      remoteScreenSharing[remoteUsername]?.isSharing
-                        ? "object-contain"
-                        : "object-cover"
-                    } rounded-lg`}
-                    onLoadedMetadata={() => {}}
-                    onCanPlay={() => {}}
-                    onError={(e) => {
-                      console.error(`Video error for ${socketId}:`, e);
-                    }}
-                  />
-                  {/* Username overlay */}
-                  <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-sm font-medium">
-                    {remoteUsername}
-                  </div>
-                  {/* Screen sharing indicator for remote users */}
-                  {remoteScreenSharing[remoteUsername]?.isSharing && (
-                    <div className="absolute top-2 left-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
-                      <Monitor className="w-3 h-3" />
-                      Screen
+            const shouldScroll = remoteStreamsArray.length > 12;
+            return (
+              <div
+                className={`w-full h-full ${
+                  shouldScroll ? "overflow-auto" : ""
+                }`}
+              >
+                {remoteStreamsArray.map(
+                  ({ socketId, stream, username: remoteUsername }) => (
+                    <div
+                      key={socketId}
+                      className="relative w-full h-full cursor-pointer transition-all duration-300 hover:ring-2 hover:ring-blue-300 touch-manipulation active:ring-2 active:ring-blue-400"
+                      onClick={() => onStreamClick("remote", socketId)}
+                    >
+                      <video
+                        autoPlay
+                        playsInline
+                        ref={(video) => {
+                          if (video && stream) {
+                            video.srcObject = stream;
+                          }
+                        }}
+                        className={`w-full h-full ${
+                          remoteScreenSharing[remoteUsername]?.isSharing
+                            ? "object-contain"
+                            : "object-cover"
+                        } rounded-lg`}
+                        onLoadedMetadata={() => {}}
+                        onCanPlay={() => {}}
+                        onError={(e) => {
+                          console.error(`Video error for ${socketId}:`, e);
+                        }}
+                      />
+                      {/* Username overlay */}
+                      <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-sm font-medium">
+                        {remoteUsername}
+                      </div>
+                      {/* Screen sharing indicator for remote users */}
+                      {remoteScreenSharing[remoteUsername]?.isSharing && (
+                        <div className="absolute top-2 left-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
+                          <Monitor className="w-3 h-3" />
+                          Screen
+                        </div>
+                      )}
+                      {/* Fullscreen button */}
+                      <div
+                        className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-1 py-1 rounded text-xs cursor-pointer hover:bg-opacity-70 transition-all duration-200"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onFullscreenClick("remote", socketId);
+                        }}
+                      >
+                        <Maximize2 className="w-3 h-3" />
+                      </div>
+                      {/* Click to focus indicator */}
+                      <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white px-1 py-1 rounded text-xs sm:text-xs md:text-sm">
+                        <span className="hidden sm:inline">Click to focus</span>
+                        <span className="sm:hidden">Tap to focus</span>
+                      </div>
                     </div>
-                  )}
-                  {/* Fullscreen button */}
-                  <div
-                    className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-1 py-1 rounded text-xs cursor-pointer hover:bg-opacity-70 transition-all duration-200"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onFullscreenClick("remote", socketId);
-                    }}
-                  >
-                    <Maximize2 className="w-3 h-3" />
+                  )
+                )}
+                {/* Scroll indicator for normal layout when there are more than 12 users */}
+                {shouldScroll && (
+                  <div className="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs pointer-events-none z-10">
+                    Scroll to see more
                   </div>
-                  {/* Click to focus indicator */}
-                  <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white px-1 py-1 rounded text-xs sm:text-xs md:text-sm">
-                    <span className="hidden sm:inline">Click to focus</span>
-                    <span className="sm:hidden">Tap to focus</span>
-                  </div>
-                </div>
-              )
+                )}
+              </div>
             );
           }
         })()

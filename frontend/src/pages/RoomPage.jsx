@@ -384,13 +384,13 @@ const RoomPage = () => {
         case 4:
           return "grid-cols-1 grid-rows-4 sm:grid-cols-2 sm:grid-rows-2"; // Mobile: vertical stack, Desktop: 2x2 grid
         default:
-          // For 5+ users, use adaptive grid
+          // For 5+ users, use adaptive grid with scrolling after 12 users
           if (remoteStreamCount <= 6)
             return "grid-cols-2 grid-rows-3 sm:grid-cols-3 sm:grid-rows-2"; // 2x3 or 3x2 grid
           if (remoteStreamCount <= 9) return "grid-cols-3 grid-rows-3"; // 3x3 grid
           if (remoteStreamCount <= 12) return "grid-cols-4 grid-rows-3"; // 4x3 grid
-          if (remoteStreamCount <= 16) return "grid-cols-4 grid-rows-4"; // 4x4 grid
-          return "grid-cols-5 grid-rows-4"; // 5x4 grid for 16+ users
+          // For 13+ users, use scrollable layout
+          return "grid-cols-4 grid-rows-3 overflow-auto"; // 4x3 grid with scrolling
       }
     }
   };
