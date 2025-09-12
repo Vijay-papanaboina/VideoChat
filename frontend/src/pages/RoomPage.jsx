@@ -362,9 +362,8 @@ const RoomPage = () => {
   // Layout classes based on number of remote streams and focused state
   const getLayoutClasses = (remoteStreamCount, isFocused) => {
     if (isFocused) {
-      // When focused, use responsive grid layout
-      // Desktop: 70/30 split, Mobile: vertical stack (focused on top, others below)
-      return "grid-cols-1 grid-rows-2 md:grid-cols-[70%_30%] md:grid-rows-1";
+      // When focused, use vertical layout: 75% focused stream at top, 25% horizontal scrollable grid below
+      return "grid-cols-1 grid-rows-[75%_25%]";
     } else {
       // Normal layout - responsive based on screen size
       switch (remoteStreamCount) {
@@ -379,7 +378,13 @@ const RoomPage = () => {
         case 4:
           return "grid-cols-1 grid-rows-4 sm:grid-cols-2 sm:grid-rows-2"; // Mobile: vertical stack, Desktop: 2x2 grid
         default:
-          return "grid-cols-1 grid-rows-5 sm:grid-cols-3 sm:grid-rows-2"; // Mobile: vertical stack, Desktop: 3x2 grid
+          // For 5+ users, use adaptive grid
+          if (remoteStreamCount <= 6)
+            return "grid-cols-2 grid-rows-3 sm:grid-cols-3 sm:grid-rows-2"; // 2x3 or 3x2 grid
+          if (remoteStreamCount <= 9) return "grid-cols-3 grid-rows-3"; // 3x3 grid
+          if (remoteStreamCount <= 12) return "grid-cols-4 grid-rows-3"; // 4x3 grid
+          if (remoteStreamCount <= 16) return "grid-cols-4 grid-rows-4"; // 4x4 grid
+          return "grid-cols-5 grid-rows-4"; // 5x4 grid for 16+ users
       }
     }
   };

@@ -37,7 +37,7 @@ export const rooms = pgTable("rooms", {
   roomId: varchar("room_id", { length: 50 }).notNull().unique(),
   password: varchar("password", { length: 255 }).notNull(),
   createdBy: integer("created_by").references(() => users.id),
-  maxUsers: integer("max_users").default(5),
+  maxUsers: integer("max_users").default(100),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

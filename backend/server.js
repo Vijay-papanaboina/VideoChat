@@ -48,7 +48,7 @@ app.use("/api/chat", chatRoutes);
 // In-memory data stores for rooms and their users
 // rooms structure: { roomId: { password: "...", users: { socketId: "username", ... }, screenSharing: { username: { isSharing: boolean } } } }
 const rooms = {};
-const MAX_USERS_PER_ROOM = 5; // Allow exactly 5 users (0-4 existing + 1 new = 5 total)
+const MAX_USERS_PER_ROOM = 100; // Allow up to 100 users per room
 
 // Function to delete all messages for a room when it's destroyed
 const deleteRoomMessages = async (roomId) => {
