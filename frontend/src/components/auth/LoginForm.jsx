@@ -16,7 +16,7 @@ const LoginForm = ({ onSwitchToRegister, onSuccess }) => {
   const { login } = useAuthActions();
   const { isLoading, error } = useAuthState();
   const [formData, setFormData] = useState({
-    username: "",
+    email: "",
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -59,14 +59,14 @@ const LoginForm = ({ onSwitchToRegister, onSuccess }) => {
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="username">Username or Email</Label>
+            <Label htmlFor="email">Email</Label>
             <Input
-              id="username"
-              name="username"
-              type="text"
-              value={formData.username}
+              id="email"
+              name="email"
+              type="email"
+              value={formData.email}
               onChange={handleChange}
-              placeholder="Enter your username or email"
+              placeholder="Enter your email"
               required
               disabled={isLoading}
             />
@@ -115,7 +115,7 @@ const LoginForm = ({ onSwitchToRegister, onSuccess }) => {
         </form>
 
         <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-muted-foreground">
             Don't have an account?{" "}
             <Button
               variant="link"

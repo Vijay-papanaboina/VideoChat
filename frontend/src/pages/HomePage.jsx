@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuthState, useAuthActions } from "../stores/authStore";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,7 +13,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ModeToggle } from "@/components/ui/mode-toggle";
-import AuthModal from "../components/auth/AuthModal";
 import UserProfile from "../components/auth/UserProfile";
 import { User, LogOut } from "lucide-react";
 
@@ -29,13 +28,12 @@ const HomePage = () => {
   const [roomId, setRoomId] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
-  const [showAuthModal, setShowAuthModal] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
 
   // Handles the form submission
   const handleJoinRoom = (e) => {
     e.preventDefault();
-    const displayUsername = isAuthenticated ? user.username : username;
+    const displayUsername = isAuthenticated ? user?.username : username;
 
     if (roomId.trim() && password.trim() && displayUsername.trim()) {
       // Navigate to the room page, passing user details in the state
@@ -62,7 +60,7 @@ const HomePage = () => {
           {isAuthenticated ? (
             <>
               <span className="text-sm text-muted-foreground">
-                Welcome, {user.firstName || user.username}
+                Welcome, {user?.firstName || user?.username || "User"}
               </span>
               <Button
                 variant="ghost"
@@ -76,13 +74,18 @@ const HomePage = () => {
               </Button>
             </>
           ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowAuthModal(true)}
-            >
-              Sign In
-            </Button>
+            <div className="flex gap-2">
+              <Link to="/login">
+                <Button variant="outline" size="sm">
+                  Sign In
+                </Button>
+              </Link>
+              <Link to="/register">
+                <Button variant="default" size="sm">
+                  Create Account
+                </Button>
+              </Link>
+            </div>
           )}
           <ModeToggle />
         </div>
@@ -124,7 +127,7 @@ const HomePage = () => {
                 <div className="p-3 bg-muted rounded-md">
                   <p className="text-sm text-muted-foreground">
                     Joining as:{" "}
-                    <span className="font-medium">{user.username}</span>
+                    <span className="font-medium">{user?.username}</span>
                   </p>
                 </div>
               )}
@@ -169,17 +172,24 @@ const HomePage = () => {
             </CardFooter>
           </form>
         </Card>
-      </main>
 
-      {/* Authentication Modals */}
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        onSuccess={() => {
-          setShowAuthModal(false);
-          // Optionally show success message
-        }}
-      />
+        {/* Profile Access Button (for logged-in users) */}
+        {isAuthenticated && (
+          <div className="mt-6 text-center">
+            <div className="text-sm text-muted-foreground mb-3">
+              Manage your rooms and create permanent rooms with admin controls
+            </div>
+            <Button
+              onClick={() => navigate("/profile")}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <User className="w-4 h-4" />
+              Go to Profile
+            </Button>
+          </div>
+        )}
+      </main>
 
       {isAuthenticated && (
         <UserProfile

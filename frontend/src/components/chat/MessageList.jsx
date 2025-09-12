@@ -43,7 +43,7 @@ const MessageList = ({ messages, currentUsername }) => {
   if (messages.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center p-4">
-        <div className="text-center text-gray-500 dark:text-gray-400">
+        <div className="text-center text-muted-foreground">
           <div className="text-4xl mb-2">💬</div>
           <p className="text-sm">No messages yet</p>
           <p className="text-xs">Start the conversation!</p>
@@ -71,7 +71,7 @@ const MessageList = ({ messages, currentUsername }) => {
             {/* Date separator */}
             {showDate && (
               <div className="flex items-center justify-center my-4">
-                <div className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-xs px-3 py-1 rounded-full">
+                <div className="bg-gray-100 dark:bg-gray-700 text-muted-foreground text-xs px-3 py-1 rounded-full">
                   {formatDate(message.timestamp)}
                 </div>
               </div>
@@ -112,7 +112,7 @@ const MessageList = ({ messages, currentUsername }) => {
                     <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
                       {isCurrentUser ? "You" : message.username}
                     </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                    <span className="text-xs text-muted-foreground">
                       {formatTime(message.timestamp)}
                     </span>
                   </div>
@@ -127,7 +127,7 @@ const MessageList = ({ messages, currentUsername }) => {
                   }`}
                 >
                   {message.type === "system" ? (
-                    <div className="text-center text-xs text-gray-500 dark:text-gray-400 italic">
+                    <div className="text-center text-xs text-muted-foreground italic">
                       {message.message}
                     </div>
                   ) : (

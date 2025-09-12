@@ -59,7 +59,10 @@ export const validateLogin = (req, res, next) => {
 
   if (!email) {
     errors.push("Email is required");
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errors.push("Invalid email format");
   }
+
   if (!password) {
     errors.push("Password is required");
   }

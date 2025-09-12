@@ -271,21 +271,17 @@ const Chat = memo(
     const currentTypingUsers = typingUsers;
 
     return (
-      <div className="w-full h-full bg-white dark:bg-gray-800 shadow-xl border-2 border-white rounded-lg flex flex-col">
+      <div className="w-full h-full bg-background shadow-xl border-2 border-white rounded-lg flex flex-col">
         {/* Chat Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-2">
             <Users className="w-5 h-5 text-blue-600" />
-            <h3 className="font-semibold text-gray-900 dark:text-white">
-              Chat
-            </h3>
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              ({userCount})
-            </span>
+            <h3 className="font-semibold text-foreground">Chat</h3>
+            <span className="text-sm text-muted-foreground">({userCount})</span>
           </div>
           <button
             onClick={() => setChatOpen(false)}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+            className="p-1 hover:bg-muted rounded"
           >
             <X className="w-4 h-4 text-gray-500" />
           </button>
@@ -295,7 +291,7 @@ const Chat = memo(
         <div className="flex-1 overflow-hidden">
           {isLoadingHistory ? (
             <div className="flex-1 flex items-center justify-center p-4">
-              <div className="text-center text-gray-500 dark:text-gray-400">
+              <div className="text-center text-muted-foreground">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                 <p className="text-sm">Loading chat history...</p>
               </div>
@@ -312,7 +308,7 @@ const Chat = memo(
         </div>
 
         {/* Message Input */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="p-4 border-t border-border">
           <form onSubmit={handleSendMessage} className="flex gap-2">
             <div className="flex-1 relative">
               <input
@@ -322,13 +318,13 @@ const Chat = memo(
                 onChange={handleInputChange}
                 onKeyPress={handleKeyPress}
                 placeholder="Type a message..."
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-background text-foreground placeholder-muted-foreground"
                 maxLength={500}
               />
               <button
                 type="button"
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-muted rounded"
               >
                 <Smile className="w-4 h-4 text-gray-500" />
               </button>
@@ -336,7 +332,7 @@ const Chat = memo(
             <button
               type="submit"
               disabled={!message.trim()}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
             >
               <Send className="w-4 h-4" />
             </button>

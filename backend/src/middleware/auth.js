@@ -7,8 +7,11 @@ const JWT_SECRET =
 // Middleware to verify JWT token
 export const authenticateToken = async (req, res, next) => {
   try {
-    const authHeader = req.headers["authorization"];
-    const token = authHeader && authHeader.split(" ")[1]; // Bearer TOKEN
+    // Try to get token from cookie first, then from Authorization header
+    const token =
+      req.cookies.authToken ||
+      (req.headers["authorization"] &&
+        req.headers["authorization"].split(" ")[1]);
 
     if (!token) {
       return res.status(401).json({
@@ -52,8 +55,10 @@ export const authenticateToken = async (req, res, next) => {
 // Middleware to verify token but don't require it (optional auth)
 export const optionalAuth = async (req, res, next) => {
   try {
-    const authHeader = req.headers["authorization"];
-    const token = authHeader && authHeader.split(" ")[1];
+    const token =
+      req.cookies.authToken ||
+      (req.headers["authorization"] &&
+        req.headers["authorization"].split(" ")[1]);
 
     if (token) {
       const decoded = jwt.verify(token, JWT_SECRET);

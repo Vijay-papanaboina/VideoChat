@@ -18,8 +18,8 @@ const AuthModal = ({ isOpen, onClose, onSuccess }) => {
   const switchToRegister = () => setIsLogin(false);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="relative bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-background/50 flex items-center justify-center p-4 z-50">
+      <div className="relative bg-background rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
         {/* Close button */}
         <Button
           variant="ghost"

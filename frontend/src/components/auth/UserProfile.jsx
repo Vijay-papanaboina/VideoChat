@@ -124,8 +124,8 @@ const UserProfile = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-background/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-background rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <Card className="border-0 shadow-none">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -310,7 +310,7 @@ const UserProfile = ({ isOpen, onClose }) => {
 
             {/* User Info */}
             <div className="mt-8 pt-6 border-t">
-              <div className="space-y-2 text-sm text-gray-600">
+              <div className="space-y-2 text-sm text-muted-foreground">
                 <div className="flex items-center">
                   <Mail className="w-4 h-4 mr-2" />
                   {user?.email}

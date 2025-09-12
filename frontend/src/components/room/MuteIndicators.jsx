@@ -13,13 +13,13 @@ const MuteIndicators = memo(
       return (
         <>
           {isAudioMuted && (
-            <div className="absolute top-4 left-4 bg-red-600 text-white px-2 py-1 rounded-full text-sm font-medium flex items-center gap-1 z-10">
+            <div className="absolute top-4 left-4 bg-destructive text-destructive-foreground px-2 py-1 rounded-full text-sm font-medium flex items-center gap-1 z-10">
               <MicOff className="w-4 h-4" />
               Muted
             </div>
           )}
           {isVideoMuted && (
-            <div className="absolute top-4 right-4 bg-red-600 text-white px-2 py-1 rounded-full text-sm font-medium flex items-center gap-1 z-10">
+            <div className="absolute top-4 right-4 bg-destructive text-destructive-foreground px-2 py-1 rounded-full text-sm font-medium flex items-center gap-1 z-10">
               <VideoOff className="w-4 h-4" />
               {isScreenSharing ? "Screen Off" : "Camera Off"}
             </div>

@@ -14,6 +14,8 @@ const MediaControlsWrapper = memo(
     onToggleScreenShare,
     onToggleChat,
     onLeaveRoom,
+    isAdmin,
+    onOpenRoomManagement,
   }) => {
     const { isAudioMuted, isVideoMuted, toggleAudio, toggleVideo } =
       useMuteState();
@@ -30,6 +32,8 @@ const MediaControlsWrapper = memo(
         onToggleScreenShare={onToggleScreenShare}
         onToggleChat={onToggleChat}
         onLeaveRoom={onLeaveRoom}
+        isAdmin={isAdmin}
+        onOpenRoomManagement={onOpenRoomManagement}
       />
     );
   }

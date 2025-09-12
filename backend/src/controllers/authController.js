@@ -44,10 +44,22 @@ export const login = async (req, res) => {
 
     const result = await authService.login(email, password);
 
+    // Set HTTP-only cookie with token
+    res.cookie("authToken", result.token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: "/",
+    });
+
     res.json({
       success: true,
       message: "Login successful",
-      data: result,
+      data: {
+        user: result.user,
+        // Don't send token in response body for security
+      },
     });
   } catch (error) {
     console.error("Login error:", error);
@@ -71,7 +83,13 @@ export const logout = async (req, res) => {
       });
     }
 
-    await authService.logout(token);
+    // Clear the HTTP-only cookie
+    res.clearCookie("authToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    });
 
     res.json({
       success: true,

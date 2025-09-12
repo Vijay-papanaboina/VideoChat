@@ -16,6 +16,7 @@ import CredentialPrompt from "../components/room/CredentialPrompt";
 import ChatSidebar from "../components/chat/ChatSidebar";
 import MuteIndicators from "../components/room/MuteIndicators";
 import { MuteStateProvider } from "../components/room/MuteStateProvider";
+import RoomManagement from "../components/room/RoomManagement";
 
 // Import utilities
 import {
@@ -56,11 +57,17 @@ const RoomPage = () => {
   // Hook 9: useState - socket ready state
   const [socketReady, setSocketReady] = useState(false);
 
+  // Hook 10: useState - admin status
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Hook 11: useState - room management modal
+  const [showRoomManagement, setShowRoomManagement] = useState(false);
+
   // Get user details from navigation state
   const username = location.state?.username;
   const password = location.state?.password;
 
-  // Hook 10: useWebRTC - WebRTC functionality (contains multiple internal hooks)
+  // Hook 12: useWebRTC - WebRTC functionality (contains multiple internal hooks)
   const {
     localStreamRef,
     peerConnectionsRef,
@@ -190,6 +197,29 @@ const RoomPage = () => {
 
         // Setup socket event listeners
         setupSocketListeners();
+
+        // Admin status tracking
+        socketRef.current.on("user-joined", (data) => {
+          // Check if the joined user is the current user and if they're admin
+          if (data.username === username && data.isAdmin) {
+            setIsAdmin(true);
+          }
+        });
+
+        // Listen for admin promotion/demotion
+        socketRef.current.on("promoted-to-admin", () => {
+          setIsAdmin(true);
+        });
+
+        socketRef.current.on("demoted-from-admin", () => {
+          setIsAdmin(false);
+        });
+
+        // Listen for being kicked
+        socketRef.current.on("kicked-from-room", (data) => {
+          alert(data.message);
+          navigate("/");
+        });
 
         // Error handlers
         socketRef.current.on("room-full", () => {
@@ -460,19 +490,19 @@ const RoomPage = () => {
             style={{ transform: "scaleX(-1)" }} // Mirror effect
           />
           {/* Local username overlay */}
-          <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-sm font-medium">
+          <div className="absolute bottom-2 left-2 bg-background bg-opacity-70 text-foreground px-2 py-1 rounded text-sm font-medium">
             {username} (You)
           </div>
           {/* Screen sharing indicator for local user */}
           {isScreenSharing && (
-            <div className="absolute top-2 left-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
+            <div className="absolute top-2 left-2 bg-green-600 text-foreground px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
               <Monitor className="w-3 h-3" />
               Screen
             </div>
           )}
           {/* Fullscreen button */}
           <div
-            className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-1 py-1 rounded text-xs cursor-pointer hover:bg-opacity-70 transition-all duration-200"
+            className="absolute top-2 right-2 bg-background bg-opacity-50 text-foreground px-1 py-1 rounded text-xs cursor-pointer hover:bg-opacity-70 transition-all duration-200"
             onClick={(e) => {
               e.stopPropagation();
               handleFullscreenClick("local");
@@ -481,7 +511,7 @@ const RoomPage = () => {
             <Maximize2 className="w-3 h-3" />
           </div>
           {/* Click to focus indicator */}
-          <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white px-1 py-1 rounded text-xs sm:text-xs md:text-sm">
+          <div className="absolute bottom-2 right-2 bg-background bg-opacity-50 text-foreground px-1 py-1 rounded text-xs sm:text-xs md:text-sm">
             <span className="hidden sm:inline">Click to focus</span>
             <span className="sm:hidden">Tap to focus</span>
           </div>
@@ -513,7 +543,7 @@ const RoomPage = () => {
 
   return (
     <MuteStateProvider localStreamRef={localStreamRef}>
-      <div className="relative w-screen h-screen bg-black flex">
+      <div className="relative w-screen h-screen bg-background flex">
         {/* Main video area */}
         <div className={`relative h-full ${isChatOpen ? "flex-1" : "w-full"}`}>
           {/* Credential Prompt Modal */}
@@ -532,6 +562,8 @@ const RoomPage = () => {
             onToggleScreenShare={toggleScreenShare}
             onToggleChat={toggleChat}
             onLeaveRoom={leaveRoom}
+            isAdmin={isAdmin}
+            onOpenRoomManagement={() => setShowRoomManagement(true)}
           />
 
           {/* Main grid for videos */}
@@ -559,6 +591,18 @@ const RoomPage = () => {
 
         {/* Chat Component - Sidebar */}
         {chatSidebar}
+
+        {/* Room Management Modal */}
+        {showRoomManagement && (
+          <RoomManagement
+            socketRef={socketRef}
+            roomId={roomId}
+            currentUser={{ username, userId: user?.id }}
+            remoteStreamsArray={remoteStreamsArray}
+            isAdmin={isAdmin}
+            onClose={() => setShowRoomManagement(false)}
+          />
+        )}
       </div>
     </MuteStateProvider>
   );

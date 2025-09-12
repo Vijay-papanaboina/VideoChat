@@ -1,270 +1,350 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 
 /**
  * Authentication store using Zustand for global state management
+ * Uses HTTP-only cookies for secure token storage
  */
-export const useAuthStore = create(
-  persist(
-    (set, get) => ({
-      // State
-      user: null,
-      token: null,
-      isAuthenticated: false,
-      isLoading: false,
-      error: null,
+export const useAuthStore = create((set) => ({
+  // State
+  user: null,
+  isAuthenticated: false,
+  isLoading: false,
+  error: null,
 
-      // Actions
-      setUser: (user) => {
-        set({ user, isAuthenticated: !!user });
-      },
+  // Actions
+  setUser: (user) => {
+    set({ user, isAuthenticated: !!user });
+  },
 
-      setToken: (token) => {
-        set({ token });
-      },
+  setLoading: (isLoading) => {
+    set({ isLoading });
+  },
 
-      setLoading: (isLoading) => {
-        set({ isLoading });
-      },
+  setError: (error) => {
+    set({ error });
+  },
 
-      setError: (error) => {
-        set({ error });
-      },
+  clearError: () => {
+    set({ error: null });
+  },
 
-      clearError: () => {
-        set({ error: null });
-      },
+  // Check authentication status on app load
+  checkAuth: async () => {
+    set({ isLoading: true, error: null });
 
-      login: async (credentials) => {
-        set({ isLoading: true, error: null });
-
-        try {
-          const response = await fetch(
-            `${
-              import.meta.env.VITE_BACKEND_URL || "http://localhost:8000"
-            }/api/auth/login`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(credentials),
-            }
-          );
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || "Login failed");
-          }
-
-          const data = await response.json();
-
-          set({
-            user: data.user,
-            token: data.token,
-            isAuthenticated: true,
-            isLoading: false,
-            error: null,
-          });
-
-          return { success: true, user: data.user };
-        } catch (error) {
-          set({
-            error: error.message,
-            isLoading: false,
-            isAuthenticated: false,
-            user: null,
-            token: null,
-          });
-          return { success: false, error: error.message };
+    try {
+      const response = await fetch(
+        `${
+          import.meta.env.VITE_BACKEND_URL || "http://localhost:8000"
+        }/api/auth/verify`,
+        {
+          method: "GET",
+          credentials: "include", // Include cookies
         }
-      },
+      );
 
-      register: async (userData) => {
-        set({ isLoading: true, error: null });
-
-        try {
-          const response = await fetch(
-            `${
-              import.meta.env.VITE_BACKEND_URL || "http://localhost:8000"
-            }/api/auth/register`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(userData),
-            }
-          );
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || "Registration failed");
-          }
-
-          const data = await response.json();
-
-          set({
-            user: data.user,
-            token: data.token,
-            isAuthenticated: true,
-            isLoading: false,
-            error: null,
-          });
-
-          return { success: true, user: data.user };
-        } catch (error) {
-          set({
-            error: error.message,
-            isLoading: false,
-            isAuthenticated: false,
-            user: null,
-            token: null,
-          });
-          return { success: false, error: error.message };
-        }
-      },
-
-      logout: () => {
+      if (response.ok) {
+        const data = await response.json();
+        set({
+          user: data.data,
+          isAuthenticated: true,
+          isLoading: false,
+          error: null,
+        });
+        return { success: true, user: data.data };
+      } else {
         set({
           user: null,
-          token: null,
           isAuthenticated: false,
           isLoading: false,
           error: null,
         });
-      },
-
-      checkAuth: async () => {
-        const { token } = get();
-        if (!token) {
-          set({ isAuthenticated: false, user: null });
-          return false;
-        }
-
-        set({ isLoading: true });
-
-        try {
-          const response = await fetch(
-            `${
-              import.meta.env.VITE_BACKEND_URL || "http://localhost:8000"
-            }/api/auth/verify`,
-            {
-              method: "GET",
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
-
-          if (!response.ok) {
-            throw new Error("Token verification failed");
-          }
-
-          const data = await response.json();
-
-          set({
-            user: data.user,
-            isAuthenticated: true,
-            isLoading: false,
-            error: null,
-          });
-
-          return true;
-        } catch (error) {
-          set({
-            user: null,
-            token: null,
-            isAuthenticated: false,
-            isLoading: false,
-            error: error.message,
-          });
-          return false;
-        }
-      },
-
-      updateProfile: async (profileData) => {
-        const { token } = get();
-        if (!token) {
-          throw new Error("Not authenticated");
-        }
-
-        set({ isLoading: true, error: null });
-
-        try {
-          const response = await fetch(
-            `${
-              import.meta.env.VITE_BACKEND_URL || "http://localhost:8000"
-            }/api/auth/profile`,
-            {
-              method: "PUT",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify(profileData),
-            }
-          );
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || "Profile update failed");
-          }
-
-          const data = await response.json();
-
-          set({
-            user: data.user,
-            isLoading: false,
-            error: null,
-          });
-
-          return { success: true, user: data.user };
-        } catch (error) {
-          set({
-            error: error.message,
-            isLoading: false,
-          });
-          return { success: false, error: error.message };
-        }
-      },
-    }),
-    {
-      name: "auth-storage",
-      // Only persist user and token, not loading states
-      partialize: (state) => ({
-        user: state.user,
-        token: state.token,
-        isAuthenticated: state.isAuthenticated,
-      }),
+        return { success: false };
+      }
+    } catch (error) {
+      set({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: error.message,
+      });
+      return { success: false };
     }
-  )
-);
+  },
+
+  login: async (credentials) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const response = await fetch(
+        `${
+          import.meta.env.VITE_BACKEND_URL || "http://localhost:8000"
+        }/api/auth/login`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include", // Include cookies
+          body: JSON.stringify(credentials),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Login failed");
+      }
+
+      const data = await response.json();
+
+      set({
+        user: data.data.user,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      });
+
+      return { success: true, user: data.data.user };
+    } catch (error) {
+      set({
+        error: error.message,
+        isLoading: false,
+        isAuthenticated: false,
+        user: null,
+      });
+      return { success: false, error: error.message };
+    }
+  },
+
+  register: async (userData) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const response = await fetch(
+        `${
+          import.meta.env.VITE_BACKEND_URL || "http://localhost:8000"
+        }/api/auth/register`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include", // Include cookies
+          body: JSON.stringify(userData),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Registration failed");
+      }
+
+      const data = await response.json();
+
+      set({
+        user: data.data.user,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      });
+
+      return { success: true, user: data.data.user };
+    } catch (error) {
+      set({
+        error: error.message,
+        isLoading: false,
+        isAuthenticated: false,
+        user: null,
+      });
+      return { success: false, error: error.message };
+    }
+  },
+
+  logout: async () => {
+    set({ isLoading: true, error: null });
+
+    try {
+      await fetch(
+        `${
+          import.meta.env.VITE_BACKEND_URL || "http://localhost:8000"
+        }/api/auth/logout`,
+        {
+          method: "POST",
+          credentials: "include", // Include cookies
+        }
+      );
+
+      // Clear state regardless of response
+      set({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null,
+      });
+
+      return { success: true };
+    } catch (error) {
+      // Clear state even if logout request fails
+      set({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: error.message,
+      });
+      return { success: true };
+    }
+  },
+
+  updateProfile: async (updateData) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const response = await fetch(
+        `${
+          import.meta.env.VITE_BACKEND_URL || "http://localhost:8000"
+        }/api/auth/profile`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include", // Include cookies
+          body: JSON.stringify(updateData),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Profile update failed");
+      }
+
+      const data = await response.json();
+
+      set({
+        user: data.data,
+        isLoading: false,
+        error: null,
+      });
+
+      return { success: true, user: data.data };
+    } catch (error) {
+      set({
+        error: error.message,
+        isLoading: false,
+      });
+      return { success: false, error: error.message };
+    }
+  },
+
+  changePassword: async (passwordData) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const response = await fetch(
+        `${
+          import.meta.env.VITE_BACKEND_URL || "http://localhost:8000"
+        }/api/auth/change-password`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include", // Include cookies
+          body: JSON.stringify(passwordData),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Password change failed");
+      }
+
+      set({
+        isLoading: false,
+        error: null,
+      });
+
+      return { success: true };
+    } catch (error) {
+      set({
+        error: error.message,
+        isLoading: false,
+      });
+      return { success: false, error: error.message };
+    }
+  },
+
+  deleteAccount: async (password) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const response = await fetch(
+        `${
+          import.meta.env.VITE_BACKEND_URL || "http://localhost:8000"
+        }/api/auth/account`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include", // Include cookies
+          body: JSON.stringify({ password }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Account deletion failed");
+      }
+
+      set({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null,
+      });
+
+      return { success: true };
+    } catch (error) {
+      set({
+        error: error.message,
+        isLoading: false,
+      });
+      return { success: false, error: error.message };
+    }
+  },
+}));
 
 /**
  * Hook for auth actions
  */
 export const useAuthActions = () => {
   const {
-    login,
-    register,
-    logout,
-    checkAuth,
-    updateProfile,
+    setUser,
     setLoading,
     setError,
     clearError,
+    checkAuth,
+    login,
+    register,
+    logout,
+    updateProfile,
+    changePassword,
+    deleteAccount,
   } = useAuthStore();
 
   return {
-    login,
-    register,
-    logout,
-    checkAuth,
-    updateProfile,
+    setUser,
     setLoading,
     setError,
     clearError,
+    checkAuth,
+    login,
+    register,
+    logout,
+    updateProfile,
+    changePassword,
+    deleteAccount,
   };
 };
 
@@ -272,11 +352,10 @@ export const useAuthActions = () => {
  * Hook for auth state
  */
 export const useAuthState = () => {
-  const { user, token, isAuthenticated, isLoading, error } = useAuthStore();
+  const { user, isAuthenticated, isLoading, error } = useAuthStore();
 
   return {
     user,
-    token,
     isAuthenticated,
     isLoading,
     error,

@@ -290,27 +290,27 @@ const EmojiPicker = ({ onEmojiSelect }) => {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg w-80 h-64 flex flex-col">
+    <div className="bg-background border border-border rounded-lg shadow-lg w-80 h-64 flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between p-3 border-b border-border">
         <h3 className="text-sm font-medium text-gray-900 dark:text-white">
           Choose Emoji
         </h3>
         <button
           onClick={() => onEmojiSelect("")}
-          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+          className="p-1 hover:bg-muted rounded"
         >
           <X className="w-4 h-4 text-gray-500" />
         </button>
       </div>
 
       {/* Category tabs */}
-      <div className="flex border-b border-gray-200 dark:border-gray-700">
+      <div className="flex border-b border-border">
         {Object.entries(categoryNames).map(([category, icon]) => (
           <button
             key={category}
             onClick={() => setActiveCategory(category)}
-            className={`flex-1 p-2 text-center text-lg hover:bg-gray-100 dark:hover:bg-gray-700 ${
+            className={`flex-1 p-2 text-center text-lg hover:bg-muted ${
               activeCategory === category
                 ? "bg-blue-50 dark:bg-blue-900/20 border-b-2 border-blue-500"
                 : ""
@@ -328,7 +328,7 @@ const EmojiPicker = ({ onEmojiSelect }) => {
             <button
               key={index}
               onClick={() => onEmojiSelect(emoji)}
-              className="p-2 text-lg hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-center"
+              className="p-2 text-lg hover:bg-muted rounded text-center"
               title={emoji}
             >
               {emoji}
