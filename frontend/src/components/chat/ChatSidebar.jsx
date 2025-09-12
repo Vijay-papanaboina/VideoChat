@@ -10,7 +10,7 @@ const ChatSidebar = memo(
     if (!isOpen) return null;
 
     return (
-      <div className="w-[15%] min-w-80 h-full py-2 pr-2">
+      <div className="w-[15%] min-w-80 h-full py-2 pr-2 animate-in slide-in-from-right fade-in duration-300">
         <Chat
           socketRef={socketRef}
           username={username}

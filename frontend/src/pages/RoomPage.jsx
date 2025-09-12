@@ -362,8 +362,14 @@ const RoomPage = () => {
   // Layout classes based on number of remote streams and focused state
   const getLayoutClasses = (remoteStreamCount, isFocused) => {
     if (isFocused) {
-      // When focused, use vertical layout: 75% focused stream at top, 25% horizontal scrollable grid below
-      return "grid-cols-1 grid-rows-[75%_25%]";
+      // When focused, layout depends on chat state
+      if (isChatOpen) {
+        // Chat open: vertical layout (75% focused stream at top, 25% horizontal scrollable grid below)
+        return "grid-cols-1 grid-rows-[75%_25%]";
+      } else {
+        // Chat closed: horizontal layout (80% focused stream on left, 20% vertical stacked streams on right)
+        return "grid-cols-[80%_20%] grid-rows-1";
+      }
     } else {
       // Normal layout - responsive based on screen size
       switch (remoteStreamCount) {
@@ -407,6 +413,7 @@ const RoomPage = () => {
         onStreamClick={handleStreamClick}
         onFullscreenClick={handleFullscreenClick}
         gridClass={gridClass}
+        isChatOpen={isChatOpen}
       />
     ),
     [
@@ -421,6 +428,7 @@ const RoomPage = () => {
       handleStreamClick,
       handleFullscreenClick,
       gridClass,
+      isChatOpen,
     ]
   );
 
@@ -505,13 +513,9 @@ const RoomPage = () => {
 
   return (
     <MuteStateProvider localStreamRef={localStreamRef}>
-      <div className="relative w-screen h-screen bg-black flex gap-1">
+      <div className="relative w-screen h-screen bg-black flex">
         {/* Main video area */}
-        <div
-          className={`relative h-full transition-all duration-300 ease-in-out ${
-            isChatOpen ? "flex-1" : "w-full"
-          }`}
-        >
+        <div className={`relative h-full ${isChatOpen ? "flex-1" : "w-full"}`}>
           {/* Credential Prompt Modal */}
           {showCredentialPrompt && (
             <CredentialPrompt

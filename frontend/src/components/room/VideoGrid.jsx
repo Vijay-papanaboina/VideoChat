@@ -17,6 +17,7 @@ const VideoGrid = ({
   onStreamClick,
   onFullscreenClick,
   gridClass,
+  isChatOpen,
 }) => {
   // Handle fullscreen mode
   if (fullscreenStream) {
@@ -263,98 +264,198 @@ const VideoGrid = ({
                   </div>
                 </div>
 
-                {/* Other streams - horizontal scrollable layout */}
+                {/* Other streams - layout depends on chat state */}
                 <div className="relative h-full overflow-hidden">
-                  <div
-                    className="flex flex-row gap-1 h-full overflow-x-auto overflow-y-hidden px-2 py-1"
-                    style={{ width: "100%" }}
-                  >
-                    {otherStreams.map(
-                      ({
-                        socketId,
-                        stream,
-                        username: remoteUsername,
-                        type,
-                      }) => (
-                        <div
-                          key={socketId}
-                          className="relative flex-shrink-0 h-full cursor-pointer transition-all duration-300 hover:ring-2 hover:ring-blue-300 touch-manipulation active:ring-2 active:ring-blue-400"
-                          style={{ width: "calc(25% - 2px)" }}
-                          onClick={() =>
-                            onStreamClick(
-                              type === "local" ? "local" : "remote",
-                              socketId
-                            )
-                          }
-                        >
-                          <video
-                            autoPlay
-                            playsInline
-                            muted={type === "local"}
-                            ref={(video) => {
-                              if (video) {
-                                if (
-                                  type === "local" &&
-                                  localStreamRef.current
-                                ) {
-                                  video.srcObject = localStreamRef.current;
-                                } else if (type !== "local" && stream) {
-                                  video.srcObject = stream;
-                                }
-                              }
-                            }}
-                            className={`w-full h-full ${
-                              type === "local"
-                                ? isScreenSharing
-                                  ? "object-contain"
-                                  : "object-cover"
-                                : remoteScreenSharing[remoteUsername]?.isSharing
-                                ? "object-contain"
-                                : "object-cover"
-                            } rounded-lg`}
-                            style={
-                              type === "local" && !isScreenSharing
-                                ? { transform: "scaleX(-1)" }
-                                : {}
-                            }
-                          />
-                          <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-sm font-medium">
-                            {remoteUsername} {type === "local" ? "(You)" : ""}
-                          </div>
-                          {/* Screen sharing indicator */}
-                          {(type === "local" && isScreenSharing) ||
-                          (type !== "local" &&
-                            remoteScreenSharing[remoteUsername]?.isSharing) ? (
-                            <div className="absolute top-2 left-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
-                              <Monitor className="w-3 h-3" />
-                              Screen
-                            </div>
-                          ) : null}
-                          {/* Fullscreen button */}
+                  {isChatOpen ? (
+                    // Chat open: horizontal scrollable layout
+                    <div
+                      className="flex flex-row gap-1 h-full overflow-x-auto overflow-y-hidden px-2 py-1"
+                      style={{ width: "100%" }}
+                    >
+                      {otherStreams.map(
+                        ({
+                          socketId,
+                          stream,
+                          username: remoteUsername,
+                          type,
+                        }) => (
                           <div
-                            className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-1 py-1 rounded text-xs cursor-pointer hover:bg-opacity-70 transition-all duration-200"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onFullscreenClick(
+                            key={socketId}
+                            className="relative flex-shrink-0 cursor-pointer transition-all duration-300 hover:ring-2 hover:ring-blue-300 touch-manipulation active:ring-2 active:ring-blue-400"
+                            style={{
+                              width: isChatOpen ? "calc(25% - 2px)" : "100%",
+                              height: isChatOpen ? "100%" : "calc(25% - 2px)",
+                            }}
+                            onClick={() =>
+                              onStreamClick(
                                 type === "local" ? "local" : "remote",
                                 socketId
-                              );
-                            }}
+                              )
+                            }
                           >
-                            <Maximize2 className="w-3 h-3" />
+                            <video
+                              autoPlay
+                              playsInline
+                              muted={type === "local"}
+                              ref={(video) => {
+                                if (video) {
+                                  if (
+                                    type === "local" &&
+                                    localStreamRef.current
+                                  ) {
+                                    video.srcObject = localStreamRef.current;
+                                  } else if (type !== "local" && stream) {
+                                    video.srcObject = stream;
+                                  }
+                                }
+                              }}
+                              className={`w-full h-full ${
+                                type === "local"
+                                  ? isScreenSharing
+                                    ? "object-contain"
+                                    : "object-cover"
+                                  : remoteScreenSharing[remoteUsername]
+                                      ?.isSharing
+                                  ? "object-contain"
+                                  : "object-cover"
+                              } rounded-lg`}
+                              style={
+                                type === "local" && !isScreenSharing
+                                  ? { transform: "scaleX(-1)" }
+                                  : {}
+                              }
+                            />
+                            <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-sm font-medium">
+                              {remoteUsername} {type === "local" ? "(You)" : ""}
+                            </div>
+                            {/* Screen sharing indicator */}
+                            {(type === "local" && isScreenSharing) ||
+                            (type !== "local" &&
+                              remoteScreenSharing[remoteUsername]
+                                ?.isSharing) ? (
+                              <div className="absolute top-2 left-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
+                                <Monitor className="w-3 h-3" />
+                                Screen
+                              </div>
+                            ) : null}
+                            {/* Fullscreen button */}
+                            <div
+                              className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-1 py-1 rounded text-xs cursor-pointer hover:bg-opacity-70 transition-all duration-200"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onFullscreenClick(
+                                  type === "local" ? "local" : "remote",
+                                  socketId
+                                );
+                              }}
+                            >
+                              <Maximize2 className="w-3 h-3" />
+                            </div>
                           </div>
-                        </div>
-                      )
-                    )}
-                  </div>
-
-                  {/* Scroll indicator when there are more than 4 users */}
-                  {otherStreams.length > 4 && (
-                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs pointer-events-none z-10">
-                      ← Scroll →
+                        )
+                      )}
+                    </div>
+                  ) : (
+                    // Chat closed: vertical stacked layout
+                    <div className="flex flex-col gap-1 h-full overflow-y-auto overflow-x-hidden px-1 py-1">
+                      {otherStreams.map(
+                        ({
+                          socketId,
+                          stream,
+                          username: remoteUsername,
+                          type,
+                        }) => (
+                          <div
+                            key={socketId}
+                            className="relative flex-shrink-0 cursor-pointer transition-all duration-300 hover:ring-2 hover:ring-blue-300 touch-manipulation active:ring-2 active:ring-blue-400"
+                            style={{
+                              width: "100%",
+                              height: "calc(25% - 2px)",
+                            }}
+                            onClick={() =>
+                              onStreamClick(
+                                type === "local" ? "local" : "remote",
+                                socketId
+                              )
+                            }
+                          >
+                            <video
+                              autoPlay
+                              playsInline
+                              muted={type === "local"}
+                              ref={(video) => {
+                                if (video) {
+                                  if (
+                                    type === "local" &&
+                                    localStreamRef.current
+                                  ) {
+                                    video.srcObject = localStreamRef.current;
+                                  } else if (type !== "local" && stream) {
+                                    video.srcObject = stream;
+                                  }
+                                }
+                              }}
+                              className={`w-full h-full ${
+                                type === "local"
+                                  ? isScreenSharing
+                                    ? "object-contain"
+                                    : "object-cover"
+                                  : remoteScreenSharing[remoteUsername]
+                                      ?.isSharing
+                                  ? "object-contain"
+                                  : "object-cover"
+                              } rounded-lg`}
+                              style={
+                                type === "local" && !isScreenSharing
+                                  ? { transform: "scaleX(-1)" }
+                                  : {}
+                              }
+                            />
+                            <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-sm font-medium">
+                              {remoteUsername} {type === "local" ? "(You)" : ""}
+                            </div>
+                            {/* Screen sharing indicator */}
+                            {(type === "local" && isScreenSharing) ||
+                            (type !== "local" &&
+                              remoteScreenSharing[remoteUsername]
+                                ?.isSharing) ? (
+                              <div className="absolute top-2 left-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
+                                <Monitor className="w-3 h-3" />
+                                Screen
+                              </div>
+                            ) : null}
+                            {/* Fullscreen button */}
+                            <div
+                              className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-1 py-1 rounded text-xs cursor-pointer hover:bg-opacity-70 transition-all duration-200"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onFullscreenClick(
+                                  type === "local" ? "local" : "remote",
+                                  socketId
+                                );
+                              }}
+                            >
+                              <Maximize2 className="w-3 h-3" />
+                            </div>
+                          </div>
+                        )
+                      )}
                     </div>
                   )}
                 </div>
+
+                {/* Scroll indicator when there are more than 4 users */}
+                {otherStreams.length > 4 && (
+                  <div
+                    className={`absolute ${
+                      isChatOpen
+                        ? "right-2 top-1/2 transform -translate-y-1/2"
+                        : "bottom-2 right-1/2 transform translate-x-1/2"
+                    } bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs pointer-events-none z-10`}
+                  >
+                    {isChatOpen ? "← Scroll →" : "↑ Scroll ↑"}
+                  </div>
+                )}
               </>
             );
           } else {
