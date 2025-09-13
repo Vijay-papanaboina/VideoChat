@@ -6,7 +6,7 @@ import { Monitor, Maximize2 } from "lucide-react";
 // Import custom hooks
 import { useWebRTC } from "../hooks/useWebRTC";
 import { useScreenShare } from "../hooks/useScreenShare";
-import { useAuthState } from "../stores/authStore";
+import { useAuthState, useAuthActions } from "../stores/authStore";
 import { useChatActions, useChatStore } from "../stores/chatStore";
 
 // Import components
@@ -41,6 +41,9 @@ const RoomPage = () => {
 
   // Hook 4: useAuthState - get user authentication state
   const { user, isAuthenticated } = useAuthState();
+
+  // Hook 4.5: useAuthActions - control navbar visibility
+  const { hideNavbar, showNavbarAction } = useAuthActions();
 
   // Hook 5: useRef - socket reference
   const socketRef = useRef(null);
@@ -131,19 +134,32 @@ const RoomPage = () => {
     socketReady
   );
 
-  // Hook 15: useEffect - check credentials and show prompt
+  // Hook 15: useEffect - navbar control
   useEffect(() => {
-    if (!username || !password) {
+    // Hide navbar when entering room
+    hideNavbar();
+
+    // Show navbar when leaving room
+    return () => {
+      showNavbarAction();
+    };
+  }, [hideNavbar, showNavbarAction]);
+
+  // Hook 16: useEffect - check credentials and show prompt
+  useEffect(() => {
+    // Only show credential prompt if username is missing
+    // Password is optional for temporary rooms
+    if (!username) {
       setShowCredentialPrompt(true);
     }
-  }, [username, password]);
+  }, [username]);
 
   // Hook 16: useEffect - main room setup effect
   useEffect(() => {
     console.log("useEffect running - checking credentials");
-    // Only proceed if credentials are available
-    if (!username || !password) {
-      console.log("No credentials found, showing prompt");
+    // Only proceed if username is available (password is optional)
+    if (!username) {
+      console.log("No username found, showing prompt");
       return;
     }
     console.log("Credentials found, proceeding with room setup");

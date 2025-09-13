@@ -41,7 +41,7 @@ const Navbar = ({ showHomeButton = true, title = "VideoCall" }) => {
           <div className="flex items-center gap-4">
             {isAuthenticated ? (
               <>
-                <Link to="/profile">
+                <Link to="/rooms">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -51,13 +51,13 @@ const Navbar = ({ showHomeButton = true, title = "VideoCall" }) => {
                     {user?.username || user?.firstName}
                   </Button>
                 </Link>
-                <Link to="/rooms">
+                <Link to="/profile">
                   <Button
                     variant="ghost"
                     size="sm"
                     className="text-foreground hover:bg-muted"
                   >
-                    Rooms
+                    Settings
                   </Button>
                 </Link>
                 <Button

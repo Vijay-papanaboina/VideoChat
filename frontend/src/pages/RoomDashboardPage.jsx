@@ -21,6 +21,7 @@ import {
   Edit,
 } from "lucide-react";
 import io from "socket.io-client";
+import CreatePermanentRoomModal from "../components/modals/CreatePermanentRoomModal";
 
 /**
  * RoomManagementPage Component
@@ -31,6 +32,7 @@ const RoomManagementPage = () => {
   const { user, isAuthenticated } = useAuthState();
   const [userRooms, setUserRooms] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const socketRef = useRef(null);
 
   // Setup socket connection
@@ -58,11 +60,11 @@ const RoomManagementPage = () => {
   }, [isAuthenticated, user?.id]);
 
   const handleCreateRoom = () => {
-    navigate("/create-room");
+    setShowCreateModal(true);
   };
 
   const handleManageRoom = (roomId) => {
-    navigate(`/manage-room/${roomId}`);
+    navigate(`/room/manage/${roomId}`);
   };
 
   const handleJoinRoom = (roomId) => {
@@ -75,22 +77,17 @@ const RoomManagementPage = () => {
     });
   };
 
-  if (!isAuthenticated) {
-    navigate("/");
-    return null;
-  }
-
   return (
     <div className="min-h-screen bg-background">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Profile Info */}
+          {/* User Info */}
           <div className="lg:col-span-1">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <User className="w-5 h-5" />
-                  Profile Information
+                  User Information
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -138,14 +135,6 @@ const RoomManagementPage = () => {
                 >
                   <Plus className="w-4 h-4" />
                   Create New Room
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => navigate("/")}
-                  className="w-full flex items-center gap-2"
-                >
-                  <Users className="w-4 h-4" />
-                  Join Room
                 </Button>
               </CardContent>
             </Card>
@@ -257,6 +246,12 @@ const RoomManagementPage = () => {
           </div>
         </div>
       </main>
+
+      {/* Create Permanent Room Modal */}
+      <CreatePermanentRoomModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+      />
     </div>
   );
 };

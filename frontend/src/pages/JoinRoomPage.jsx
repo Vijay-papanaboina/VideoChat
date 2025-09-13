@@ -18,6 +18,7 @@ const JoinRoomPage = () => {
   const { isAuthenticated, user } = useAuthState();
   const [roomId, setRoomId] = useState("");
   const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState("");
   const [roomInfo, setRoomInfo] = useState(null);
@@ -74,7 +75,7 @@ const JoinRoomPage = () => {
     setIsJoining(true);
 
     try {
-      const displayUsername = isAuthenticated ? user?.username : "Anonymous";
+      const displayUsername = isAuthenticated ? user?.username : username;
       navigate(`/room/${roomId.trim().toUpperCase()}`, {
         state: {
           isJoining: true,
@@ -142,6 +143,23 @@ const JoinRoomPage = () => {
                   </Button>
                 </div>
               </div>
+
+              {!isAuthenticated && (
+                <div className="space-y-2">
+                  <Label htmlFor="username">Your Name</Label>
+                  <Input
+                    id="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Enter your display name"
+                    required
+                    disabled={isJoining || isChecking}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    This will be your name in the room
+                  </p>
+                </div>
+              )}
 
               {/* Room Status */}
               {roomInfo && (
@@ -224,7 +242,8 @@ const JoinRoomPage = () => {
                   isJoining ||
                   !roomId ||
                   !roomInfo?.exists ||
-                  !roomInfo?.isActive
+                  !roomInfo?.isActive ||
+                  (!isAuthenticated && !username)
                 }
               >
                 {isJoining ? "Joining Room..." : "Join Room"}

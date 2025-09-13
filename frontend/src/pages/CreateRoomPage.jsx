@@ -19,6 +19,7 @@ const CreateRoomPage = () => {
   const { isAuthenticated, user } = useAuthState();
   const [roomId, setRoomId] = useState("");
   const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
@@ -71,7 +72,7 @@ const CreateRoomPage = () => {
       }
 
       // Room doesn't exist, proceed to create
-      const displayUsername = isAuthenticated ? user?.username : "Anonymous";
+      const displayUsername = isAuthenticated ? user?.username : username;
       navigate(`/room/${roomId}`, {
         state: {
           isCreating: true,
@@ -91,10 +92,11 @@ const CreateRoomPage = () => {
       <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold text-foreground mb-4">
-            Create a New Room
+            Create a Temporary Room
           </h2>
           <p className="text-muted-foreground">
-            Set up a new video call room and invite others to join
+            Set up a temporary video call room that anyone can join with the
+            room ID
           </p>
         </div>
 
@@ -157,6 +159,23 @@ const CreateRoomPage = () => {
                 )}
               </div>
 
+              {!isAuthenticated && (
+                <div className="space-y-2">
+                  <Label htmlFor="username">Your Name</Label>
+                  <Input
+                    id="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Enter your display name"
+                    required
+                    disabled={isCreating}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    This will be your name in the room
+                  </p>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="password">Password (Optional)</Label>
                 <Input
@@ -188,7 +207,7 @@ const CreateRoomPage = () => {
                 {isAuthenticated && (
                   <div className="mt-2 pt-2 border-t border-blue-200 dark:border-blue-700">
                     <Link
-                      to="/create-room"
+                      to="/rooms"
                       className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
                     >
                       Create a permanent room with admin controls →
@@ -200,7 +219,9 @@ const CreateRoomPage = () => {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={isCreating || !roomId}
+                disabled={
+                  isCreating || !roomId || (!isAuthenticated && !username)
+                }
               >
                 {isCreating ? "Creating Room..." : "Create Room"}
               </Button>

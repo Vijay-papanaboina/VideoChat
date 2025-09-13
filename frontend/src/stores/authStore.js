@@ -8,8 +8,9 @@ export const useAuthStore = create((set) => ({
   // State
   user: null,
   isAuthenticated: false,
-  isLoading: false,
+  isLoading: true, // Start with loading true for initial auth check
   error: null,
+  showNavbar: true, // Navbar visibility
 
   // Actions
   setUser: (user) => {
@@ -26,6 +27,15 @@ export const useAuthStore = create((set) => ({
 
   clearError: () => {
     set({ error: null });
+  },
+
+  // Navbar actions
+  hideNavbar: () => {
+    set({ showNavbar: false });
+  },
+
+  showNavbarAction: () => {
+    set({ showNavbar: true });
   },
 
   // Check authentication status on app load
@@ -331,6 +341,8 @@ export const useAuthActions = () => {
     updateProfile,
     changePassword,
     deleteAccount,
+    hideNavbar,
+    showNavbarAction,
   } = useAuthStore();
 
   return {
@@ -345,6 +357,8 @@ export const useAuthActions = () => {
     updateProfile,
     changePassword,
     deleteAccount,
+    hideNavbar,
+    showNavbarAction,
   };
 };
 
@@ -352,12 +366,14 @@ export const useAuthActions = () => {
  * Hook for auth state
  */
 export const useAuthState = () => {
-  const { user, isAuthenticated, isLoading, error } = useAuthStore();
+  const { user, isAuthenticated, isLoading, error, showNavbar } =
+    useAuthStore();
 
   return {
     user,
     isAuthenticated,
     isLoading,
     error,
+    showNavbar,
   };
 };

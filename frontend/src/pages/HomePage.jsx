@@ -180,12 +180,12 @@ const HomePage = () => {
               Manage your rooms and create permanent rooms with admin controls
             </div>
             <Button
-              onClick={() => navigate("/profile")}
+              onClick={() => navigate("/rooms")}
               variant="outline"
               className="flex items-center gap-2"
             >
               <User className="w-4 h-4" />
-              Go to Profile
+              Go to Rooms
             </Button>
           </div>
         )}

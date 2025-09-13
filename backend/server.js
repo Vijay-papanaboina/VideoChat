@@ -18,6 +18,9 @@ import { errorHandler, notFound } from "./src/middleware/errorHandler.js";
 // Import services for cleanup and room tracking
 import { chatService } from "./src/services/chatService.js";
 import { roomService } from "./src/services/roomService.js";
+import { db } from "./src/db.js";
+import { users } from "./src/schema.js";
+import { eq } from "drizzle-orm";
 
 // Initialize Express app and HTTP server
 const app = express();
@@ -54,14 +57,7 @@ app.use("/api/chat", chatRoutes);
 const rooms = {};
 const MAX_USERS_PER_ROOM = 100; // Allow up to 100 users per room
 
-// Function to delete all messages for a room when it's destroyed
-const deleteRoomMessages = async (roomId) => {
-  try {
-    await chatService.deleteRoomMessages(roomId);
-  } catch (error) {
-    console.error(`❌ Failed to delete messages for room ${roomId}:`, error);
-  }
-};
+// Note: deleteRoomMessages function removed - CASCADE deletion handles this automatically
 
 // A simple root route for health checks
 app.get("/", (req, res) => {
@@ -121,10 +117,32 @@ io.on("connection", (socket) => {
     const { roomId, password, username, userId = null } = data;
 
     // --- Room Validation ---
-    // If the room doesn't exist, create it with the provided password
+    // If the room doesn't exist in memory, check database and create if needed
     if (!rooms[roomId]) {
       const isPermanentRoom = userId !== null; // Permanent rooms are created by logged-in users
 
+      if (isPermanentRoom) {
+        // Check if permanent room exists in database
+        const permanentRoomExists = await roomService.checkPermanentRoomExists(
+          roomId
+        );
+        if (!permanentRoomExists) {
+          socket.emit("join-error", {
+            message: "Permanent room does not exist. Please create it first.",
+          });
+          return;
+        }
+      } else {
+        // For temporary rooms, create in database
+        try {
+          await roomService.createTemporaryRoom(roomId, password, username);
+        } catch (error) {
+          console.error(`❌ Failed to create temporary room in DB:`, error);
+          // Continue with room creation even if DB fails
+        }
+      }
+
+      // Create room in memory
       rooms[roomId] = {
         password: password,
         users: {},
@@ -142,15 +160,19 @@ io.on("connection", (socket) => {
         } room created: ${roomId} by user: ${userId || "anonymous"}`
       );
 
-      // Track room session in database for analytics
+      // Create chat session in database
       try {
-        await roomService.createRoomSession(roomId);
+        if (isPermanentRoom) {
+          await roomService.createPermanentChatSession(roomId);
+        } else {
+          await roomService.createTemporaryChatSession(roomId);
+        }
       } catch (error) {
-        console.error(`❌ Failed to create room session in DB:`, error);
+        console.error(`❌ Failed to create chat session in DB:`, error);
         // Continue with room creation even if DB fails
       }
     } else {
-      // Room exists, check if user is trying to create a room that already exists
+      // Room exists in memory, check if user is trying to create a room that already exists
       const existingRoom = rooms[roomId];
       if (existingRoom.isPermanent && !existingRoom.isActive) {
         socket.emit("join-error", {
@@ -343,21 +365,43 @@ io.on("connection", (socket) => {
       console.log(`❌ Room ${data.roomId} does not exist!`);
     }
 
-    // Save message to database
+    // Determine room type and save message to appropriate database table
+    const room = rooms[data.roomId];
+    const roomType = room?.isPermanent ? "permanent" : "temporary";
+
     try {
-      await chatService.sendMessage({
-        roomId: data.roomId,
-        userId: data.userId || null,
-        username: data.username,
-        message: data.message,
-        messageType: data.type || "text",
-      });
-      console.log(`💾 Message saved to database`);
+      if (roomType === "permanent") {
+        await chatService.sendPermanentMessage({
+          roomId: data.roomId,
+          userId: data.userId || null,
+          username: data.username,
+          message: data.message,
+          messageType: data.type || "text",
+        });
+      } else {
+        await chatService.sendTemporaryMessage({
+          roomId: data.roomId,
+          userId: data.userId || null,
+          username: data.username,
+          message: data.message,
+          messageType: data.type || "text",
+        });
+      }
+      console.log(`💾 Message saved to ${roomType} database`);
 
       // Update message count in room session
       try {
-        const messageCount = await chatService.getRoomMessageCount(data.roomId);
-        await roomService.updateRoomMessageCount(data.roomId, messageCount);
+        if (roomType === "permanent") {
+          await roomService.updatePermanentChatSession(data.roomId, {
+            lastMessageAt: new Date(),
+            messageCount: { increment: 1 },
+          });
+        } else {
+          await roomService.updateTemporaryChatSession(data.roomId, {
+            lastMessageAt: new Date(),
+            messageCount: { increment: 1 },
+          });
+        }
       } catch (error) {
         console.error(`❌ Failed to update message count:`, error);
         // Don't fail the message send if count update fails
@@ -427,18 +471,28 @@ io.on("connection", (socket) => {
             // For permanent rooms, just mark as inactive but keep in memory
             rooms[roomId].isActive = false;
             console.log(`💤 Permanent room ${roomId} marked as inactive`);
+
+            // End permanent chat session in database
+            try {
+              await roomService.endPermanentChatSession(roomId);
+            } catch (error) {
+              console.error(
+                `❌ Failed to end permanent chat session in DB:`,
+                error
+              );
+            }
           } else {
             // For temporary rooms, completely destroy them
             console.log(`🗑️ Temporary room ${roomId} being destroyed`);
 
-            // Delete all messages for this room since it's being destroyed
-            await deleteRoomMessages(roomId);
-
-            // End room session in database for analytics
+            // Delete all temporary room data from database
             try {
-              await roomService.endRoomSession(roomId);
+              await roomService.deleteTemporaryRoom(roomId);
             } catch (error) {
-              console.error(`❌ Failed to end room session in DB:`, error);
+              console.error(
+                `❌ Failed to delete temporary room from DB:`,
+                error
+              );
               // Continue with room destruction even if DB fails
             }
 
@@ -614,7 +668,7 @@ io.on("connection", (socket) => {
   });
 
   // Create permanent room (for logged-in users)
-  socket.on("create-permanent-room", (data) => {
+  socket.on("create-permanent-room", async (data) => {
     const { roomId, username, userId } = data;
 
     if (!userId) {
@@ -625,36 +679,46 @@ io.on("connection", (socket) => {
     }
 
     if (rooms[roomId]) {
-      socket.emit("error", { message: "Room already exists" });
+      socket.emit("error", { message: "Room already exists in memory" });
       return;
     }
 
-    // Create permanent room
-    rooms[roomId] = {
-      password: null, // No password for permanent rooms
-      users: {},
-      screenSharing: {},
-      isActive: true,
-      createdBy: userId,
-      createdAt: new Date(),
-      admins: [userId],
-      isPermanent: true,
-      isInviteOnly: true,
-    };
+    try {
+      // Create permanent room in database
+      await roomService.createPermanentRoom(roomId, userId);
 
-    console.log(
-      `🏠 Permanent room created: ${roomId} by user: ${username} (${userId})`
-    );
+      // Create permanent room in memory
+      rooms[roomId] = {
+        password: null, // No password for permanent rooms
+        users: {},
+        screenSharing: {},
+        isActive: true,
+        createdBy: userId,
+        createdAt: new Date(),
+        admins: [userId],
+        isPermanent: true,
+        isInviteOnly: true,
+      };
 
-    // Notify creator that room was created
-    socket.emit("permanent-room-created", {
-      roomId,
-      message: "Permanent room created successfully",
-    });
+      console.log(
+        `🏠 Permanent room created: ${roomId} by user: ${username} (${userId})`
+      );
+
+      // Notify creator that room was created
+      socket.emit("permanent-room-created", {
+        roomId,
+        message: "Permanent room created successfully",
+      });
+    } catch (error) {
+      console.error("Failed to create permanent room:", error);
+      socket.emit("error", {
+        message: "Failed to create permanent room. Please try again.",
+      });
+    }
   });
 
   // Get user's rooms
-  socket.on("get-user-rooms", (data) => {
+  socket.on("get-user-rooms", async (data) => {
     const { userId } = data;
 
     if (!userId) {
@@ -662,60 +726,336 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // Find all rooms where user is a member or admin
-    const userRooms = [];
-    for (const roomId in rooms) {
-      const room = rooms[roomId];
-      const userInRoom = Object.values(room.users).find(
-        (user) => user.userId === userId
-      );
+    try {
+      // Get user's permanent rooms from database
+      const dbRooms = await roomService.getUserPermanentRooms(userId);
 
-      if (userInRoom) {
-        userRooms.push({
-          roomId,
-          isAdmin: userInRoom.isAdmin,
-          memberCount: Object.keys(room.users).length,
+      // Also check for active rooms in memory where user is currently present
+      const activeRooms = [];
+      for (const roomId in rooms) {
+        const room = rooms[roomId];
+        const userInRoom = Object.values(room.users).find(
+          (user) => user.userId === userId
+        );
+
+        if (userInRoom) {
+          activeRooms.push({
+            roomId,
+            isAdmin: userInRoom.isAdmin,
+            memberCount: Object.keys(room.users).length,
+            createdAt: room.createdAt,
+            isActive: room.isActive,
+            isCurrentlyActive: true,
+          });
+        }
+      }
+
+      // Combine database rooms with active rooms
+      const allUserRooms = [
+        ...dbRooms.map((room) => ({
+          roomId: room.roomId,
+          isAdmin: true, // User is admin of rooms they created
+          memberCount: 0, // Will be updated when room is active
           createdAt: room.createdAt,
           isActive: room.isActive,
-        });
-      }
-    }
+          isCurrentlyActive: false,
+        })),
+        ...activeRooms.filter(
+          (activeRoom) =>
+            !dbRooms.some((dbRoom) => dbRoom.roomId === activeRoom.roomId)
+        ),
+      ];
 
-    socket.emit("user-rooms", userRooms);
+      socket.emit("user-rooms", allUserRooms);
+    } catch (error) {
+      console.error("Failed to get user rooms:", error);
+      socket.emit("error", { message: "Failed to fetch user rooms" });
+    }
   });
 
   // Get room information (for admins)
-  socket.on("get-room-info", (data) => {
-    const { roomId } = data;
-    const userRoom = rooms[roomId];
+  socket.on("get-room-info", async (data) => {
+    const { roomId, userId } = data;
 
-    if (!userRoom) {
-      socket.emit("error", { message: "Room not found" });
-      return;
+    // First check if it's a permanent room in the database
+    const permanentRoomExists = await roomService.checkPermanentRoomExists(
+      roomId
+    );
+
+    if (permanentRoomExists) {
+      // This is a permanent room - check database permissions
+      try {
+        // Get user's permanent rooms to check if they created this one
+        const userRooms = await roomService.getUserPermanentRooms(userId);
+        const isCreator = userRooms.some((room) => room.roomId === roomId);
+
+        if (!isCreator) {
+          socket.emit("error", {
+            message: "Insufficient permissions - not the room creator",
+          });
+          return;
+        }
+      } catch (error) {
+        console.error("Failed to check permanent room permissions:", error);
+        socket.emit("error", { message: "Failed to verify permissions" });
+        return;
+      }
+    } else {
+      // Check if it's a temporary room in memory
+      const userRoom = rooms[roomId];
+      if (!userRoom) {
+        socket.emit("error", { message: "Room not found" });
+        return;
+      }
+
+      // For temporary rooms, check if user is currently in room and is admin
+      const currentUser = userRoom.users[socket.id];
+      if (!currentUser || !currentUser.isAdmin) {
+        socket.emit("error", { message: "Insufficient permissions" });
+        return;
+      }
     }
 
-    const currentUser = userRoom.users[socket.id];
-    if (!currentUser || !currentUser.isAdmin) {
-      socket.emit("error", { message: "Insufficient permissions" });
-      return;
+    // Get room members from database for permanent rooms
+    let roomMembers = [];
+    let createdByUsername = null;
+    let roomData = null;
+
+    if (permanentRoomExists) {
+      try {
+        // Get permanent room data from database
+        const userRooms = await roomService.getUserPermanentRooms(userId);
+        roomData = userRooms.find((room) => room.roomId === roomId);
+
+        roomMembers = await roomService.getPermanentRoomMembers(roomId);
+
+        // Get creator's username from database
+        if (roomData && roomData.createdBy) {
+          const creatorInfo = await db
+            .select({ username: users.username })
+            .from(users)
+            .where(eq(users.id, roomData.createdBy))
+            .limit(1);
+
+          if (creatorInfo.length > 0) {
+            createdByUsername = creatorInfo[0].username;
+          }
+        }
+      } catch (error) {
+        console.error("Failed to get room members:", error);
+      }
+    } else {
+      // For temporary rooms, use in-memory data
+      roomData = rooms[roomId];
     }
 
     // Send room information to admin
     const roomInfo = {
       roomId,
-      createdBy: userRoom.createdBy,
-      createdAt: userRoom.createdAt,
-      admins: userRoom.admins,
-      userCount: Object.keys(userRoom.users).length,
-      users: Object.values(userRoom.users).map((user) => ({
-        username: user.username,
-        userId: user.userId,
-        isAdmin: user.isAdmin,
-        joinedAt: user.joinedAt,
-      })),
+      createdBy: roomData?.createdBy,
+      createdByUsername,
+      createdAt: roomData?.createdAt,
+      admins: roomData?.admins || [roomData?.createdBy].filter(Boolean),
+      isPermanent: permanentRoomExists,
+      isInviteOnly: roomData?.isInviteOnly || false,
+      userCount: permanentRoomExists
+        ? 0
+        : Object.keys(roomData?.users || {}).length,
+      users: permanentRoomExists
+        ? []
+        : Object.values(roomData?.users || {}).map((user) => ({
+            username: user.username,
+            userId: user.userId,
+            isAdmin: user.isAdmin,
+            joinedAt: user.joinedAt,
+          })),
+      members: roomMembers, // Permanent room members from database
     };
 
     socket.emit("room-info", roomInfo);
+  });
+
+  // Add member to permanent room
+  socket.on("add-room-member", async (data) => {
+    const { roomId, targetUserId, addedBy, isAdmin = false } = data;
+
+    try {
+      // Verify the user has permission to add members
+      const userRooms = await roomService.getUserPermanentRooms(addedBy);
+      const isCreator = userRooms.some((room) => room.roomId === roomId);
+
+      if (!isCreator) {
+        socket.emit("error", {
+          message: "Insufficient permissions to add members",
+        });
+        return;
+      }
+
+      // Add the member
+      await roomService.addPermanentRoomMember(
+        roomId,
+        targetUserId,
+        addedBy,
+        isAdmin
+      );
+
+      // Get updated room members
+      const roomMembers = await roomService.getPermanentRoomMembers(roomId);
+
+      socket.emit("member-added", {
+        roomId,
+        message: "Member added successfully",
+        members: roomMembers,
+      });
+
+      console.log(
+        `👥 Member ${targetUserId} added to room ${roomId} by ${addedBy}`
+      );
+    } catch (error) {
+      console.error("Failed to add room member:", error);
+      socket.emit("error", {
+        message: error.message || "Failed to add member",
+      });
+    }
+  });
+
+  // Remove member from permanent room
+  socket.on("remove-room-member", async (data) => {
+    const { roomId, targetUserId, removedBy } = data;
+
+    try {
+      // Verify the user has permission to remove members
+      const userRooms = await roomService.getUserPermanentRooms(removedBy);
+      const isCreator = userRooms.some((room) => room.roomId === roomId);
+
+      if (!isCreator) {
+        socket.emit("error", {
+          message: "Insufficient permissions to remove members",
+        });
+        return;
+      }
+
+      // Don't allow removing the room creator
+      if (targetUserId === removedBy) {
+        socket.emit("error", { message: "Cannot remove the room creator" });
+        return;
+      }
+
+      // Remove the member
+      await roomService.removePermanentRoomMember(roomId, targetUserId);
+
+      // Get updated room members
+      const roomMembers = await roomService.getPermanentRoomMembers(roomId);
+
+      socket.emit("member-removed", {
+        roomId,
+        message: "Member removed successfully",
+        members: roomMembers,
+      });
+
+      console.log(
+        `👥 Member ${targetUserId} removed from room ${roomId} by ${removedBy}`
+      );
+    } catch (error) {
+      console.error("Failed to remove room member:", error);
+      socket.emit("error", {
+        message: error.message || "Failed to remove member",
+      });
+    }
+  });
+
+  // Update member admin status
+  socket.on("update-member-admin", async (data) => {
+    const { roomId, targetUserId, isAdmin, updatedBy } = data;
+
+    try {
+      // Verify the user has permission to update admin status
+      const userRooms = await roomService.getUserPermanentRooms(updatedBy);
+      const isCreator = userRooms.some((room) => room.roomId === roomId);
+
+      if (!isCreator) {
+        socket.emit("error", {
+          message: "Insufficient permissions to update admin status",
+        });
+        return;
+      }
+
+      // Don't allow changing the room creator's admin status
+      if (targetUserId === updatedBy) {
+        socket.emit("error", {
+          message: "Cannot change your own admin status",
+        });
+        return;
+      }
+
+      // Update the member's admin status
+      await roomService.updatePermanentRoomMemberAdmin(
+        roomId,
+        targetUserId,
+        isAdmin
+      );
+
+      // Get updated room members
+      const roomMembers = await roomService.getPermanentRoomMembers(roomId);
+
+      socket.emit("member-admin-updated", {
+        roomId,
+        message: `Member admin status updated to ${isAdmin}`,
+        members: roomMembers,
+      });
+
+      console.log(
+        `👥 Member ${targetUserId} admin status updated to ${isAdmin} in room ${roomId} by ${updatedBy}`
+      );
+    } catch (error) {
+      console.error("Failed to update member admin status:", error);
+      socket.emit("error", {
+        message: error.message || "Failed to update admin status",
+      });
+    }
+  });
+
+  // Delete permanent room
+  socket.on("delete-permanent-room", async (data) => {
+    const { roomId, userId } = data;
+
+    try {
+      // Verify user is the room creator
+      const userRooms = await roomService.getUserPermanentRooms(userId);
+      const userRoom = userRooms.find((room) => room.roomId === roomId);
+
+      if (!userRoom || userRoom.createdBy !== userId) {
+        socket.emit("error", {
+          message: "Only room creators can delete rooms",
+        });
+        return;
+      }
+
+      // Delete the room from database (CASCADE will handle related data)
+      await roomService.deletePermanentRoom(roomId);
+
+      // Remove room from in-memory state if it exists
+      if (rooms[roomId]) {
+        delete rooms[roomId];
+      }
+
+      // Notify all users in the room that it's been deleted
+      io.to(roomId).emit("room-deleted", { roomId });
+
+      // Disconnect all users from the room
+      const roomSockets = await io.in(roomId).fetchSockets();
+      roomSockets.forEach((roomSocket) => {
+        roomSocket.leave(roomId);
+      });
+
+      console.log(
+        `🗑️ Permanent room deleted: ${roomId} by user ${userId} (CASCADE deletion handled)`
+      );
+      socket.emit("room-deleted", { roomId });
+    } catch (error) {
+      console.error("Failed to delete permanent room:", error);
+      socket.emit("error", { message: "Failed to delete room" });
+    }
   });
 });
 

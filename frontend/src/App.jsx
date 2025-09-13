@@ -1,61 +1,80 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "./components/ui/theme-provider";
-import { useAuthActions } from "./stores/authStore";
 import LoadingScreen from "./components/ui/LoadingScreen";
 import Navbar from "./components/layout/Navbar";
+import ProtectedRoutes from "./components/auth/ProtectedRoutes";
+import PublicRoutes from "./components/auth/PublicRoutes";
+import { useAuthActions, useAuthState } from "./stores/authStore";
 import LandingPage from "./pages/LandingPage";
 import RoomPage from "./pages/RoomPage";
 import UserProfilePage from "./pages/UserProfilePage";
-import RoomManagementPage from "./pages/ProfilePage";
+import RoomDashboardPage from "./pages/RoomDashboardPage";
+import IndividualRoomManagementPage from "./pages/RoomManagementPage";
 import CreateRoomPage from "./pages/CreateRoomPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
-import CreateRoomPageNew from "./pages/CreateRoomPage";
 import JoinRoomPage from "./pages/JoinRoomPage";
 
 function App() {
   const { checkAuth } = useAuthActions();
-  const [isLoading, setIsLoading] = useState(true);
+  const { isLoading, showNavbar } = useAuthState();
 
   // Check authentication status on app load
   useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        await checkAuth();
-      } catch (error) {
-        console.error("Auth check failed:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initializeAuth();
+    checkAuth();
   }, [checkAuth]);
 
   return (
     <ThemeProvider defaultTheme="light" storageKey="video-call-theme">
       <div className="App">
-        <Navbar />
+        {showNavbar && <Navbar />}
         <div className="relative">
           <Routes>
+            {/* Public Routes */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/room/:roomId" element={<RoomPage />} />
-            <Route path="/profile" element={<UserProfilePage />} />
-            <Route path="/rooms" element={<RoomManagementPage />} />
-            <Route path="/create-room" element={<CreateRoomPage />} />
-            <Route path="/room/create" element={<CreateRoomPageNew />} />
+            <Route path="/room/create" element={<CreateRoomPage />} />
             <Route path="/room/join" element={<JoinRoomPage />} />
+
+            {/* Auth-only Public Routes (redirect authenticated users) */}
             <Route
-              path="/manage-room/:roomId"
-              element={<RoomManagementPage />}
+              path="/login"
+              element={
+                <PublicRoutes>
+                  <LoginPage />
+                </PublicRoutes>
+              }
             />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
+            <Route
+              path="/register"
+              element={
+                <PublicRoutes>
+                  <RegisterPage />
+                </PublicRoutes>
+              }
+            />
+
+            {/* Protected Routes */}
+            <Route
+              path="/*"
+              element={
+                <ProtectedRoutes>
+                  <Routes>
+                    <Route path="/profile" element={<UserProfilePage />} />
+                    <Route path="/rooms" element={<RoomDashboardPage />} />
+                    <Route
+                      path="/room/manage/:roomId"
+                      element={<IndividualRoomManagementPage />}
+                    />
+                  </Routes>
+                </ProtectedRoutes>
+              }
+            />
           </Routes>
 
           {/* Show loading overlay while checking authentication */}
-          {isLoading && <LoadingScreen />}
+          {isLoading && <LoadingScreen hideNavbar={!showNavbar} />}
         </div>
       </div>
     </ThemeProvider>

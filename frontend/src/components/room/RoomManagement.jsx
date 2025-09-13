@@ -26,9 +26,12 @@ const RoomManagement = ({
   // Request room information when component mounts
   useEffect(() => {
     if (isAdmin && socketRef.current) {
-      socketRef.current.emit("get-room-info", { roomId });
+      socketRef.current.emit("get-room-info", {
+        roomId,
+        userId: currentUser?.userId,
+      });
     }
-  }, [isAdmin, roomId, socketRef]);
+  }, [isAdmin, roomId, socketRef, currentUser]);
 
   // Listen for room info response
   useEffect(() => {
