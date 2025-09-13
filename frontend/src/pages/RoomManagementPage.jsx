@@ -23,8 +23,10 @@ import {
   Check,
   AlertTriangle,
   Trash2,
+  Mail,
 } from "lucide-react";
 import io from "socket.io-client";
+import SendInviteModal from "../components/modals/SendInviteModal";
 
 /**
  * RoomManagementPage Component
@@ -40,6 +42,7 @@ const RoomManagementPage = () => {
   const [copySuccess, setCopySuccess] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const socketRef = useRef(null);
 
   // Setup socket connection
@@ -131,6 +134,7 @@ const RoomManagementPage = () => {
         username: user?.username,
         password: null,
         isPermanentRoom: true,
+        from: `/room/manage/${roomId}`, // Track where they came from
       },
     });
   };
@@ -222,6 +226,14 @@ const RoomManagementPage = () => {
               </h1>
             </div>
             <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowInviteModal(true)}
+                className="flex items-center gap-2"
+              >
+                <Mail className="w-4 h-4" />
+                Send Invite
+              </Button>
               <Button
                 variant="outline"
                 onClick={handleJoinRoom}
@@ -529,6 +541,22 @@ const RoomManagementPage = () => {
           </div>
         </div>
       )}
+
+      {/* Send Invite Modal */}
+      <SendInviteModal
+        isOpen={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        roomId={roomId}
+        onInviteSent={() => {
+          // Refresh room info to show updated member count
+          if (socketRef.current && user?.id) {
+            socketRef.current.emit("get-room-info", {
+              roomId,
+              userId: user.id,
+            });
+          }
+        }}
+      />
     </div>
   );
 };

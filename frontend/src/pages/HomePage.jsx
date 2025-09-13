@@ -42,6 +42,7 @@ const HomePage = () => {
         state: {
           username: displayUsername,
           password,
+          from: "/", // Track where they came from
         },
       });
     } else {

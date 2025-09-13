@@ -16,10 +16,22 @@ export const register = async (req, res) => {
       bio,
     });
 
+    // Set HTTP-only cookie with token
+    res.cookie("authToken", result.token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: "/",
+    });
+
     res.status(201).json({
       success: true,
       message: "User registered successfully",
-      data: result,
+      data: {
+        user: result.user,
+        // Don't send token in response body for security
+      },
     });
   } catch (error) {
     console.error("Registration error:", error);
@@ -215,6 +227,31 @@ export const verifyToken = async (req, res) => {
     res.status(401).json({
       success: false,
       message: error.message,
+    });
+  }
+};
+
+// Search users
+export const searchUsers = async (req, res) => {
+  try {
+    const { q } = req.query;
+
+    if (!q || q.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: "Search query must be at least 2 characters long",
+      });
+    }
+
+    const { roomId } = req.query;
+    const users = await authService.searchUsers(q, 10, req.user.id, roomId);
+
+    res.json(users);
+  } catch (error) {
+    console.error("Search users error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to search users",
     });
   }
 };

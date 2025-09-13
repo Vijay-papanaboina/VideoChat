@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 /**
  * CredentialPrompt Component
@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
  */
 const CredentialPrompt = ({ roomId, onClose }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [promptUsername, setPromptUsername] = useState("");
   const [promptPassword, setPromptPassword] = useState("");
 
@@ -17,7 +18,11 @@ const CredentialPrompt = ({ roomId, onClose }) => {
       onClose();
       // Update the location state with new credentials
       navigate(`/room/${roomId}`, {
-        state: { username: promptUsername, password: promptPassword },
+        state: {
+          username: promptUsername,
+          password: promptPassword,
+          from: location.state?.from || "/rooms", // Preserve where they came from
+        },
         replace: true,
       });
     }

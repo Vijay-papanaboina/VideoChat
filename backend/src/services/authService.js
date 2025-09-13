@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, or, ilike, ne, notInArray } from "drizzle-orm";
 import { db } from "../db.js";
 import { users, userSessions } from "../schema.js";
 
@@ -64,6 +64,59 @@ export const updateUser = async (id, updateData) => {
 export const deleteUser = async (id) => {
   await db.delete(users).where(eq(users.id, id));
   return true;
+};
+
+// Search users by username (excluding current user and room members)
+export const searchUsers = async (
+  query,
+  limit = 10,
+  excludeUserId = null,
+  excludeRoomMembers = null
+) => {
+  try {
+    const conditions = [
+      eq(users.isActive, true),
+      ilike(users.username, `%${query}%`),
+    ];
+
+    // Exclude current user from search results if provided
+    if (excludeUserId) {
+      conditions.push(ne(users.id, excludeUserId));
+    }
+
+    // Get room members if roomId is provided (for marking them as already members)
+    let roomMemberIds = [];
+    if (excludeRoomMembers) {
+      // Import permanentRoomMembers here to avoid circular dependency
+      const { permanentRoomMembers } = await import("../schema.js");
+      const roomMembers = await db
+        .select({ userId: permanentRoomMembers.userId })
+        .from(permanentRoomMembers)
+        .where(eq(permanentRoomMembers.roomId, excludeRoomMembers));
+
+      roomMemberIds = roomMembers.map((member) => member.userId);
+    }
+
+    const searchResults = await db
+      .select({
+        id: users.id,
+        username: users.username,
+      })
+      .from(users)
+      .where(and(...conditions))
+      .limit(limit);
+
+    // Add membership status to each result
+    const resultsWithMembership = searchResults.map((user) => ({
+      ...user,
+      isRoomMember: roomMemberIds.includes(user.id),
+    }));
+
+    return resultsWithMembership;
+  } catch (error) {
+    console.error("Failed to search users:", error);
+    return [];
+  }
 };
 
 // Store user session
@@ -344,6 +397,7 @@ export const authService = {
   findUserById,
   findUserByEmail,
   findUserByUsername,
+  searchUsers,
   updateUser,
   deleteUser,
   storeSession,

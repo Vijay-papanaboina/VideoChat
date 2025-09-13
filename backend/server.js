@@ -57,6 +57,14 @@ app.use("/api/chat", chatRoutes);
 const rooms = {};
 const MAX_USERS_PER_ROOM = 100; // Allow up to 100 users per room
 
+// Helper function to get socket by user ID
+const getUserSocket = (userId) => {
+  // This is a simplified implementation
+  // In a production app, you'd want to maintain a user-to-socket mapping
+  // For now, we'll return null and handle it gracefully
+  return null;
+};
+
 // Note: deleteRoomMessages function removed - CASCADE deletion handles this automatically
 
 // A simple root route for health checks
@@ -727,8 +735,11 @@ io.on("connection", (socket) => {
     }
 
     try {
-      // Get user's permanent rooms from database
-      const dbRooms = await roomService.getUserPermanentRooms(userId);
+      // Get user's permanent rooms (both created and member of)
+      const [createdRooms, memberRooms] = await Promise.all([
+        roomService.getUserPermanentRooms(userId),
+        roomService.getUserPermanentRoomMemberships(userId),
+      ]);
 
       // Also check for active rooms in memory where user is currently present
       const activeRooms = [];
@@ -750,19 +761,34 @@ io.on("connection", (socket) => {
         }
       }
 
-      // Combine database rooms with active rooms
+      // Combine created rooms, member rooms, and active rooms
       const allUserRooms = [
-        ...dbRooms.map((room) => ({
+        // Rooms user created
+        ...createdRooms.map((room) => ({
           roomId: room.roomId,
           isAdmin: true, // User is admin of rooms they created
           memberCount: 0, // Will be updated when room is active
           createdAt: room.createdAt,
           isActive: room.isActive,
           isCurrentlyActive: false,
+          roomType: "created",
+        })),
+        // Rooms user is a member of (but didn't create)
+        ...memberRooms.map((membership) => ({
+          roomId: membership.roomId,
+          isAdmin: membership.isAdmin,
+          memberCount: 0, // Will be updated when room is active
+          createdAt: membership.roomCreatedAt,
+          isActive: membership.roomIsActive,
+          isCurrentlyActive: false,
+          roomType: "member",
         })),
         ...activeRooms.filter(
           (activeRoom) =>
-            !dbRooms.some((dbRoom) => dbRoom.roomId === activeRoom.roomId)
+            !createdRooms.some((room) => room.roomId === activeRoom.roomId) &&
+            !memberRooms.some(
+              (membership) => membership.roomId === activeRoom.roomId
+            )
         ),
       ];
 
@@ -1055,6 +1081,331 @@ io.on("connection", (socket) => {
     } catch (error) {
       console.error("Failed to delete permanent room:", error);
       socket.emit("error", { message: "Failed to delete room" });
+    }
+  });
+
+  // ===== ROOM INVITATION HANDLERS =====
+
+  // Send room invitation
+  socket.on("send-room-invitation", async (data) => {
+    const { roomId, invitedUserId, invitedBy, message, expiresAt } = data;
+
+    try {
+      // Verify user has permission to invite (is room creator or admin)
+      const userRooms = await roomService.getUserPermanentRooms(invitedBy);
+      const userRoom = userRooms.find((room) => room.roomId === roomId);
+
+      if (!userRoom) {
+        socket.emit("error", {
+          message: "You don't have permission to invite users to this room",
+        });
+        return;
+      }
+
+      // Check if user is creator or admin
+      const isCreator = userRoom.createdBy === invitedBy;
+      const isAdmin = userRoom.isAdmin;
+
+      if (!isCreator && !isAdmin) {
+        socket.emit("error", {
+          message: "Only room creators and admins can send invitations",
+        });
+        return;
+      }
+
+      // Send the invitation
+      const invitation = await roomService.sendRoomInvitation(
+        roomId,
+        invitedUserId,
+        invitedBy,
+        message,
+        expiresAt
+      );
+
+      // Notify the invited user if they're online
+      const invitedUserSocket = getUserSocket(invitedUserId);
+      if (invitedUserSocket) {
+        invitedUserSocket.emit("room-invitation-received", {
+          invitation,
+          roomId,
+          inviterUsername: userRoom.username,
+        });
+      }
+
+      socket.emit("room-invitation-sent", {
+        message: "Invitation sent successfully",
+        invitation,
+      });
+
+      console.log(
+        `📧 Room invitation sent: ${roomId} -> user ${invitedUserId} by ${invitedBy}`
+      );
+    } catch (error) {
+      // Handle specific error types gracefully
+      if (error.code === "USER_ALREADY_MEMBER") {
+        console.log(
+          `ℹ️  Invitation skipped: User ${invitedUserId} is already a member of room ${roomId}`
+        );
+        socket.emit("error", {
+          message: "This user is already a member of this room",
+          code: "USER_ALREADY_MEMBER",
+        });
+      } else if (error.code === "INVITATION_ALREADY_EXISTS") {
+        console.log(
+          `ℹ️  Invitation skipped: User ${invitedUserId} already has a pending invitation for room ${roomId}`
+        );
+        socket.emit("error", {
+          message: "This user already has a pending invitation for this room",
+          code: "INVITATION_ALREADY_EXISTS",
+        });
+      } else {
+        console.error("❌ Failed to send room invitation:", error.message);
+        socket.emit("error", {
+          message: "Failed to send invitation. Please try again.",
+          code: "INTERNAL_ERROR",
+        });
+      }
+    }
+  });
+
+  // Accept room invitation
+  socket.on("accept-room-invitation", async (data) => {
+    const { invitationId, userId } = data;
+
+    try {
+      const invitation = await roomService.acceptRoomInvitation(
+        invitationId,
+        userId
+      );
+
+      // Notify the inviter if they're online
+      const inviterSocket = getUserSocket(invitation.invitedBy);
+      if (inviterSocket) {
+        inviterSocket.emit("room-invitation-accepted", {
+          invitation,
+          roomId: invitation.roomId,
+        });
+      }
+
+      socket.emit("room-invitation-accepted", {
+        message: "Invitation accepted successfully",
+        invitation,
+        roomId: invitation.roomId,
+      });
+
+      console.log(
+        `✅ Room invitation accepted: ${invitationId} by user ${userId}`
+      );
+    } catch (error) {
+      console.error("Failed to accept room invitation:", error);
+      socket.emit("error", {
+        message: error.message || "Failed to accept invitation",
+      });
+    }
+  });
+
+  // Decline room invitation
+  socket.on("decline-room-invitation", async (data) => {
+    const { invitationId, userId } = data;
+
+    try {
+      const invitation = await roomService.declineRoomInvitation(
+        invitationId,
+        userId
+      );
+
+      // Notify the inviter if they're online
+      const inviterSocket = getUserSocket(invitation.invitedBy);
+      if (inviterSocket) {
+        inviterSocket.emit("room-invitation-declined", {
+          invitation,
+          roomId: invitation.roomId,
+        });
+      }
+
+      socket.emit("room-invitation-declined", {
+        message: "Invitation declined",
+        invitation,
+      });
+
+      console.log(
+        `❌ Room invitation declined: ${invitationId} by user ${userId}`
+      );
+    } catch (error) {
+      console.error("Failed to decline room invitation:", error);
+      socket.emit("error", {
+        message: error.message || "Failed to decline invitation",
+      });
+    }
+  });
+
+  // Get user's pending invitations
+  socket.on("get-user-invitations", async (data) => {
+    const { userId } = data;
+
+    try {
+      const invitations = await roomService.getUserPendingInvitations(userId);
+      socket.emit("user-invitations", invitations);
+    } catch (error) {
+      console.error("Failed to get user invitations:", error);
+      socket.emit("error", {
+        message: "Failed to get invitations",
+      });
+    }
+  });
+
+  // Get room invitations (for room admins)
+  socket.on("get-room-invitations", async (data) => {
+    const { roomId, userId } = data;
+
+    try {
+      // Verify user has permission to view invitations
+      const userRooms = await roomService.getUserPermanentRooms(userId);
+      const userRoom = userRooms.find((room) => room.roomId === roomId);
+
+      if (!userRoom) {
+        socket.emit("error", {
+          message:
+            "You don't have permission to view invitations for this room",
+        });
+        return;
+      }
+
+      const invitations = await roomService.getRoomInvitations(roomId);
+      socket.emit("room-invitations", invitations);
+    } catch (error) {
+      console.error("Failed to get room invitations:", error);
+      socket.emit("error", {
+        message: "Failed to get room invitations",
+      });
+    }
+  });
+
+  // Cancel room invitation
+  socket.on("cancel-room-invitation", async (data) => {
+    const { invitationId, cancelledBy, roomId } = data;
+
+    try {
+      // Verify user has permission to cancel invitations
+      const userRooms = await roomService.getUserPermanentRooms(cancelledBy);
+      const userRoom = userRooms.find((room) => room.roomId === roomId);
+
+      if (!userRoom) {
+        socket.emit("error", {
+          message:
+            "You don't have permission to cancel invitations for this room",
+        });
+        return;
+      }
+
+      const invitation = await roomService.cancelRoomInvitation(
+        invitationId,
+        cancelledBy
+      );
+
+      // Notify the invited user if they're online
+      const invitedUserSocket = getUserSocket(invitation.invitedUserId);
+      if (invitedUserSocket) {
+        invitedUserSocket.emit("room-invitation-cancelled", {
+          invitation,
+          roomId,
+        });
+      }
+
+      socket.emit("room-invitation-cancelled", {
+        message: "Invitation cancelled successfully",
+        invitation,
+      });
+
+      console.log(
+        `🚫 Room invitation cancelled: ${invitationId} by user ${cancelledBy}`
+      );
+    } catch (error) {
+      console.error("Failed to cancel room invitation:", error);
+      socket.emit("error", {
+        message: error.message || "Failed to cancel invitation",
+      });
+    }
+  });
+
+  // ===== USER LEAVE ROOM HANDLER =====
+
+  // User leaves a room voluntarily
+  socket.on("leave-room", async (data) => {
+    const { roomId, userId } = data;
+
+    try {
+      // Check if user is a member of the room
+      const isMember = await roomService.isPermanentRoomMember(roomId, userId);
+      if (!isMember) {
+        socket.emit("error", {
+          message: "You are not a member of this room",
+          code: "NOT_MEMBER",
+        });
+        return;
+      }
+
+      // Check if user is the room creator (creators can't leave, they must delete)
+      const userRooms = await roomService.getUserPermanentRooms(userId);
+      const isCreator = userRooms.some((room) => room.roomId === roomId);
+
+      if (isCreator) {
+        socket.emit("error", {
+          message:
+            "Room creators cannot leave their own room. You must delete the room instead.",
+          code: "CREATOR_CANNOT_LEAVE",
+        });
+        return;
+      }
+
+      // Remove user from room
+      await roomService.removePermanentRoomMember(roomId, userId);
+
+      // Notify room members if room is active
+      if (rooms[roomId]) {
+        const room = rooms[roomId];
+        const userInRoom = Object.values(room.users).find(
+          (user) => user.userId === userId
+        );
+
+        if (userInRoom) {
+          // Remove user from active room
+          delete room.users[userInRoom.socketId];
+
+          // Notify remaining room members
+          Object.values(room.users).forEach((member) => {
+            const memberSocket = getUserSocket(member.userId);
+            if (memberSocket) {
+              memberSocket.emit("user-left-room", {
+                roomId,
+                userId,
+                username: userInRoom.username,
+                remainingUsers: Object.keys(room.users).length,
+              });
+            }
+          });
+        }
+      }
+
+      // Notify the user who left
+      socket.emit("room-left", {
+        message: "Successfully left the room",
+        roomId,
+      });
+
+      // Refresh user's room list
+      const userSocket = getUserSocket(userId);
+      if (userSocket) {
+        userSocket.emit("get-user-rooms", { userId });
+      }
+
+      console.log(`👥 User ${userId} left permanent room ${roomId}`);
+    } catch (error) {
+      console.error("Failed to leave room:", error);
+      socket.emit("error", {
+        message: "Failed to leave room. Please try again.",
+        code: "LEAVE_FAILED",
+      });
     }
   });
 });

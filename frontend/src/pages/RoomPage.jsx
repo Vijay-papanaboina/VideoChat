@@ -389,9 +389,13 @@ const RoomPage = () => {
     console.log("=== STATE AFTER CLEANUP ===");
     debugMediaTracks();
 
-    console.log("AGGRESSIVE cleanup completed, navigating to home");
-    // Navigate back to home
-    navigate("/");
+    console.log(
+      "AGGRESSIVE cleanup completed, navigating back to previous page"
+    );
+
+    // Navigate back to where the user came from
+    const previousPath = location.state?.from || "/rooms";
+    navigate(previousPath);
   };
 
   // Dynamic Layout Calculation

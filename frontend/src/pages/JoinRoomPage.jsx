@@ -81,6 +81,7 @@ const JoinRoomPage = () => {
           isJoining: true,
           password: password,
           username: displayUsername,
+          from: "/join-room", // Track where they came from
         },
       });
     } catch (error) {

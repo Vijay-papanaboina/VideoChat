@@ -78,6 +78,7 @@ const CreateRoomPage = () => {
           isCreating: true,
           password: password,
           username: displayUsername,
+          from: "/create-room", // Track where they came from
         },
       });
     } catch (error) {

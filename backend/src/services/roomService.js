@@ -8,6 +8,7 @@ import {
   temporaryChatMessages,
   permanentChatMessages,
   permanentRoomMembers,
+  roomInvitations,
   users,
 } from "../schema.js";
 
@@ -523,12 +524,257 @@ export const deletePermanentRoom = async (roomId) => {
     // - permanent_room_members (members)
     // - permanent_chat_messages (chat messages)
     // - permanent_chat_sessions (chat sessions)
+    // - room_invitations (invitations)
     await db.delete(permanentRooms).where(eq(permanentRooms.roomId, roomId));
     console.log(
       `🗑️ Permanent room deleted: ${roomId} (with CASCADE deletion of related data)`
     );
   } catch (error) {
     console.error(`❌ Failed to delete permanent room:`, error);
+    throw error;
+  }
+};
+
+// ===== ROOM INVITATION FUNCTIONS =====
+
+// Send an invitation to a user for a permanent room
+export const sendRoomInvitation = async (
+  roomId,
+  invitedUserId,
+  invitedBy,
+  message = null,
+  expiresAt = null
+) => {
+  try {
+    // Check if user is already a member
+    const isMember = await isPermanentRoomMember(roomId, invitedUserId);
+    if (isMember) {
+      const error = new Error("This user is already a member of this room");
+      error.code = "USER_ALREADY_MEMBER";
+      error.statusCode = 409; // Conflict
+      throw error;
+    }
+
+    // Check if there's already a pending invitation
+    const existingInvite = await db
+      .select()
+      .from(roomInvitations)
+      .where(
+        and(
+          eq(roomInvitations.roomId, roomId),
+          eq(roomInvitations.invitedUserId, invitedUserId),
+          eq(roomInvitations.status, "pending")
+        )
+      )
+      .limit(1);
+
+    if (existingInvite.length > 0) {
+      const error = new Error(
+        "This user already has a pending invitation for this room"
+      );
+      error.code = "INVITATION_ALREADY_EXISTS";
+      error.statusCode = 409; // Conflict
+      throw error;
+    }
+
+    const [newInvitation] = await db
+      .insert(roomInvitations)
+      .values({
+        roomId,
+        invitedUserId,
+        invitedBy,
+        message,
+        status: "pending",
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        createdAt: new Date(),
+      })
+      .returning();
+
+    console.log(
+      `📧 Room invitation sent successfully: ${roomId} -> user ${invitedUserId} by ${invitedBy}`
+    );
+    return newInvitation;
+  } catch (error) {
+    // Only log as error if it's not a business logic error (already has error code)
+    if (error.code) {
+      console.log(`ℹ️  Room invitation validation: ${error.message}`);
+    } else {
+      console.error(
+        `❌ Unexpected error sending room invitation:`,
+        error.message
+      );
+    }
+    throw error;
+  }
+};
+
+// Accept a room invitation
+export const acceptRoomInvitation = async (invitationId, userId) => {
+  try {
+    // Get the invitation
+    const [invitation] = await db
+      .select()
+      .from(roomInvitations)
+      .where(
+        and(
+          eq(roomInvitations.id, invitationId),
+          eq(roomInvitations.invitedUserId, userId),
+          eq(roomInvitations.status, "pending")
+        )
+      )
+      .limit(1);
+
+    if (!invitation) {
+      throw new Error("Invitation not found or already responded to");
+    }
+
+    // Check if invitation has expired
+    if (invitation.expiresAt && new Date() > invitation.expiresAt) {
+      // Mark as expired
+      await db
+        .update(roomInvitations)
+        .set({ status: "expired", respondedAt: new Date() })
+        .where(eq(roomInvitations.id, invitationId));
+      throw new Error("Invitation has expired");
+    }
+
+    // Add user as member to the room
+    await addPermanentRoomMember(
+      invitation.roomId,
+      userId,
+      invitation.invitedBy,
+      false // Not admin by default
+    );
+
+    // Update invitation status
+    const [updatedInvitation] = await db
+      .update(roomInvitations)
+      .set({ status: "accepted", respondedAt: new Date() })
+      .where(eq(roomInvitations.id, invitationId))
+      .returning();
+
+    console.log(
+      `✅ User ${userId} accepted invitation for room ${invitation.roomId}`
+    );
+    return updatedInvitation;
+  } catch (error) {
+    console.error(`❌ Failed to accept room invitation:`, error);
+    throw error;
+  }
+};
+
+// Decline a room invitation
+export const declineRoomInvitation = async (invitationId, userId) => {
+  try {
+    const [updatedInvitation] = await db
+      .update(roomInvitations)
+      .set({ status: "declined", respondedAt: new Date() })
+      .where(
+        and(
+          eq(roomInvitations.id, invitationId),
+          eq(roomInvitations.invitedUserId, userId),
+          eq(roomInvitations.status, "pending")
+        )
+      )
+      .returning();
+
+    if (!updatedInvitation) {
+      throw new Error("Invitation not found or already responded to");
+    }
+
+    console.log(
+      `❌ User ${userId} declined invitation for room ${updatedInvitation.roomId}`
+    );
+    return updatedInvitation;
+  } catch (error) {
+    console.error(`❌ Failed to decline room invitation:`, error);
+    throw error;
+  }
+};
+
+// Get all pending invitations for a user
+export const getUserPendingInvitations = async (userId) => {
+  try {
+    const invitations = await db
+      .select({
+        id: roomInvitations.id,
+        roomId: roomInvitations.roomId,
+        message: roomInvitations.message,
+        expiresAt: roomInvitations.expiresAt,
+        createdAt: roomInvitations.createdAt,
+        invitedBy: roomInvitations.invitedBy,
+        inviterUsername: users.username,
+        inviterEmail: users.email,
+      })
+      .from(roomInvitations)
+      .innerJoin(users, eq(roomInvitations.invitedBy, users.id))
+      .where(
+        and(
+          eq(roomInvitations.invitedUserId, userId),
+          eq(roomInvitations.status, "pending")
+        )
+      )
+      .orderBy(roomInvitations.createdAt);
+
+    return invitations;
+  } catch (error) {
+    console.error(`❌ Failed to get user pending invitations:`, error);
+    return [];
+  }
+};
+
+// Get all invitations sent for a room (by room admins)
+export const getRoomInvitations = async (roomId) => {
+  try {
+    const invitations = await db
+      .select({
+        id: roomInvitations.id,
+        invitedUserId: roomInvitations.invitedUserId,
+        message: roomInvitations.message,
+        status: roomInvitations.status,
+        expiresAt: roomInvitations.expiresAt,
+        createdAt: roomInvitations.createdAt,
+        respondedAt: roomInvitations.respondedAt,
+        invitedBy: roomInvitations.invitedBy,
+        invitedUsername: users.username,
+        invitedEmail: users.email,
+      })
+      .from(roomInvitations)
+      .innerJoin(users, eq(roomInvitations.invitedUserId, users.id))
+      .where(eq(roomInvitations.roomId, roomId))
+      .orderBy(roomInvitations.createdAt);
+
+    return invitations;
+  } catch (error) {
+    console.error(`❌ Failed to get room invitations:`, error);
+    return [];
+  }
+};
+
+// Cancel a pending invitation
+export const cancelRoomInvitation = async (invitationId, cancelledBy) => {
+  try {
+    const [updatedInvitation] = await db
+      .update(roomInvitations)
+      .set({ status: "cancelled", respondedAt: new Date() })
+      .where(
+        and(
+          eq(roomInvitations.id, invitationId),
+          eq(roomInvitations.status, "pending")
+        )
+      )
+      .returning();
+
+    if (!updatedInvitation) {
+      throw new Error("Invitation not found or already responded to");
+    }
+
+    console.log(
+      `🚫 User ${cancelledBy} cancelled invitation ${invitationId} for room ${updatedInvitation.roomId}`
+    );
+    return updatedInvitation;
+  } catch (error) {
+    console.error(`❌ Failed to cancel room invitation:`, error);
     throw error;
   }
 };
@@ -567,4 +813,12 @@ export const roomService = {
 
   // Delete permanent room (CASCADE will handle related data)
   deletePermanentRoom,
+
+  // Room invitation functions
+  sendRoomInvitation,
+  acceptRoomInvitation,
+  declineRoomInvitation,
+  getUserPendingInvitations,
+  getRoomInvitations,
+  cancelRoomInvitation,
 };

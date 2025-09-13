@@ -185,3 +185,31 @@ export const permanentRoomMembers = pgTable(
     ),
   })
 );
+
+// Room invitations table (for sending invites to users)
+export const roomInvitations = pgTable(
+  "room_invitations",
+  {
+    id: serial("id").primaryKey(),
+    roomId: varchar("room_id", { length: 50 })
+      .notNull()
+      .references(() => permanentRooms.roomId, { onDelete: "cascade" }),
+    invitedUserId: integer("invited_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    invitedBy: integer("invited_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    message: text("message"), // Optional invitation message
+    status: varchar("status", { length: 20 }).default("pending"), // pending, accepted, declined, expired
+    expiresAt: timestamp("expires_at"), // Optional expiration date
+    createdAt: timestamp("created_at").defaultNow(),
+    respondedAt: timestamp("responded_at"), // When user accepted/declined
+  },
+  (table) => ({
+    // Ensure a user can only have one pending invite per room
+    roomUserPendingUnique: unique(
+      "room_invitations_room_user_pending_unique"
+    ).on(table.roomId, table.invitedUserId),
+  })
+);

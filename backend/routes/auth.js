@@ -26,5 +26,6 @@ router.put(
 );
 router.delete("/account", authController.deleteAccount);
 router.get("/verify", authController.verifyToken);
+router.get("/users/search", authController.searchUsers);
 
 export default router;

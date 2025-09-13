@@ -5,6 +5,7 @@ import LoadingScreen from "./components/ui/LoadingScreen";
 import Navbar from "./components/layout/Navbar";
 import ProtectedRoutes from "./components/auth/ProtectedRoutes";
 import PublicRoutes from "./components/auth/PublicRoutes";
+import InviteNotifications from "./components/InviteNotifications";
 import { useAuthActions, useAuthState } from "./stores/authStore";
 import LandingPage from "./pages/LandingPage";
 import RoomPage from "./pages/RoomPage";
@@ -75,6 +76,9 @@ function App() {
 
           {/* Show loading overlay while checking authentication */}
           {isLoading && <LoadingScreen hideNavbar={!showNavbar} />}
+
+          {/* Global invite notifications */}
+          <InviteNotifications />
         </div>
       </div>
     </ThemeProvider>
