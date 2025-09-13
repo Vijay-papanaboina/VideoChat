@@ -14,7 +14,7 @@ import { X, Plus, Users, Lock, Crown, Copy, Check } from "lucide-react";
 import { useAuthState } from "../../stores/authStore";
 import io from "socket.io-client";
 
-const CreatePermanentRoomModal = ({ isOpen, onClose }) => {
+const CreatePermanentRoomModal = ({ isOpen, onClose, onRoomCreated }) => {
   const [roomId, setRoomId] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState("");
@@ -91,8 +91,14 @@ const CreatePermanentRoomModal = ({ isOpen, onClose }) => {
         socket.disconnect();
         setSuccess(true);
         setIsCreating(false);
-        // Don't navigate to room - just show success message
-        // The room will appear in the dashboard
+        // Call the callback to refresh rooms list
+        if (onRoomCreated) {
+          onRoomCreated();
+        }
+        // Close modal after a short delay to show success message
+        setTimeout(() => {
+          handleClose();
+        }, 1500);
       });
 
       socket.on("error", (error) => {

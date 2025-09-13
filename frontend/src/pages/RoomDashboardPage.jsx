@@ -63,6 +63,13 @@ const RoomManagementPage = () => {
     setShowCreateModal(true);
   };
 
+  const handleRoomCreated = () => {
+    // Refresh the rooms list
+    if (socketRef.current && user?.id) {
+      socketRef.current.emit("get-user-rooms", { userId: user.id });
+    }
+  };
+
   const handleManageRoom = (roomId) => {
     navigate(`/room/manage/${roomId}`);
   };
@@ -251,6 +258,7 @@ const RoomManagementPage = () => {
       <CreatePermanentRoomModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
+        onRoomCreated={handleRoomCreated}
       />
     </div>
   );
