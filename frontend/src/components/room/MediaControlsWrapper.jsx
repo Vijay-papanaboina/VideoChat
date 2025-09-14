@@ -16,6 +16,11 @@ const MediaControlsWrapper = memo(
     onLeaveRoom,
     isAdmin,
     onOpenRoomManagement,
+    // Recording props
+    isRecording,
+    onToggleRecording,
+    // Screenshot props
+    onTakeScreenshot,
   }) => {
     const { isAudioMuted, isVideoMuted, toggleAudio, toggleVideo } =
       useMuteState();
@@ -34,6 +39,11 @@ const MediaControlsWrapper = memo(
         onLeaveRoom={onLeaveRoom}
         isAdmin={isAdmin}
         onOpenRoomManagement={onOpenRoomManagement}
+        // Recording props
+        isRecording={isRecording}
+        onToggleRecording={onToggleRecording}
+        // Screenshot props
+        onTakeScreenshot={onTakeScreenshot}
       />
     );
   }

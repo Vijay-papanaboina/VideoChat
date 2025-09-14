@@ -13,14 +13,14 @@ const CredentialPrompt = ({ roomId, onClose }) => {
 
   const handleCredentialSubmit = (e) => {
     e.preventDefault();
-    if (promptUsername.trim() && promptPassword.trim()) {
+    if (promptUsername.trim()) {
       // Close the dialog
       onClose();
       // Update the location state with new credentials
       navigate(`/room/${roomId}`, {
         state: {
           username: promptUsername,
-          password: promptPassword,
+          password: promptPassword.trim() || null, // Allow empty password
           from: location.state?.from || "/rooms", // Preserve where they came from
         },
         replace: true,
@@ -35,7 +35,8 @@ const CredentialPrompt = ({ roomId, onClose }) => {
           Enter Room Credentials
         </h2>
         <p className="text-gray-600 dark:text-gray-300 mb-4">
-          Please enter your username and room password to join this room.
+          Please enter your username to join this room. Password only required
+          if the room has one.
         </p>
         <form onSubmit={handleCredentialSubmit} className="space-y-4">
           <div>
@@ -60,7 +61,7 @@ const CredentialPrompt = ({ roomId, onClose }) => {
               htmlFor="prompt-password"
               className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
             >
-              Room Password
+              Room Password (Optional)
             </label>
             <input
               id="prompt-password"
@@ -68,8 +69,7 @@ const CredentialPrompt = ({ roomId, onClose }) => {
               value={promptPassword}
               onChange={(e) => setPromptPassword(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-              placeholder="Enter room password"
-              required
+              placeholder="Enter room password if required"
             />
           </div>
           <div className="flex gap-3">

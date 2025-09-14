@@ -2,26 +2,29 @@ import express from "express";
 import * as authController from "../src/controllers/authController.js";
 import { authenticateToken } from "../src/middleware/auth.js";
 import {
-  validateRegistration,
   validateLogin,
-  validateProfileUpdate,
-  validatePasswordChange,
+  validateProfileUpdateMiddleware,
+  validatePasswordChangeMiddleware,
 } from "../src/middleware/validation.js";
 
 const router = express.Router();
 
 // Public routes
-router.post("/register", validateRegistration, authController.register);
+router.post("/register", authController.register);
 router.post("/login", validateLogin, authController.login);
 
 // Protected routes
 router.use(authenticateToken);
 router.post("/logout", authController.logout);
 router.get("/profile", authController.getProfile);
-router.put("/profile", validateProfileUpdate, authController.updateProfile);
+router.put(
+  "/profile",
+  validateProfileUpdateMiddleware,
+  authController.updateProfile
+);
 router.put(
   "/change-password",
-  validatePasswordChange,
+  validatePasswordChangeMiddleware,
   authController.changePassword
 );
 router.delete("/account", authController.deleteAccount);

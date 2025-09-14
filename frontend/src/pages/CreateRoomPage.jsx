@@ -13,6 +13,7 @@ import {
 } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Plus, Users, Lock, Globe, Copy, Check } from "lucide-react";
+import { validateRoomCreate, getFirstError } from "../utils/validation";
 
 const CreateRoomPage = () => {
   const navigate = useNavigate();
@@ -49,6 +50,19 @@ const CreateRoomPage = () => {
     setIsCreating(true);
 
     try {
+      // Validate room create data
+      const roomData = {
+        roomId,
+        isAuthenticated,
+        username: isAuthenticated ? user?.username : username,
+      };
+      const errors = validateRoomCreate(roomData);
+      if (errors.length > 0) {
+        setError(getFirstError(errors));
+        setIsCreating(false);
+        return;
+      }
+
       // Check if room already exists by trying to join it
       const response = await fetch(
         `${

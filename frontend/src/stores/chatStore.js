@@ -15,7 +15,7 @@ import { create } from "zustand";
  * Chat store using Zustand for global state management
  * NO PERSISTENCE - messages are only kept in memory during the session
  */
-export const useChatStore = create((set, get) => ({
+export const useChatStore = create((set) => ({
   // State
   messages: [],
   isChatOpen: false, // Open by default
@@ -83,18 +83,6 @@ export const useChatStore = create((set, get) => ({
   clearTypingUsers: () => {
     set({ typingUsers: [] });
   },
-
-  // Get messages for current room (now all messages are for current room)
-  getCurrentRoomMessages: () => {
-    const { messages } = get();
-    return messages;
-  },
-
-  // Get typing users for current room
-  getCurrentRoomTypingUsers: () => {
-    const { typingUsers } = get();
-    return typingUsers;
-  },
 }));
 
 /**
@@ -134,15 +122,8 @@ export const useChatActions = () => {
  * Hook for chat state
  */
 export const useChatState = () => {
-  const {
-    messages,
-    isChatOpen,
-    currentRoomId,
-    isTyping,
-    typingUsers,
-    getCurrentRoomMessages,
-    getCurrentRoomTypingUsers,
-  } = useChatStore();
+  const { messages, isChatOpen, currentRoomId, isTyping, typingUsers } =
+    useChatStore();
 
   return {
     messages,
@@ -150,7 +131,5 @@ export const useChatState = () => {
     currentRoomId,
     isTyping,
     typingUsers,
-    getCurrentRoomMessages,
-    getCurrentRoomTypingUsers,
   };
 };

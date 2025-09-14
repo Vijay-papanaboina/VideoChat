@@ -104,13 +104,7 @@ export const requireAdmin = (req, res, next) => {
     });
   }
 
-  // Add role checking logic here when you implement roles
-  // if (req.user.role !== 'admin') {
-  //   return res.status(403).json({
-  //     success: false,
-  //     error: "Admin access required"
-  //   });
-  // }
+  // Role checking logic can be added here when needed
 
   next();
 };

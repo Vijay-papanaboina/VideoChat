@@ -6,6 +6,8 @@ import { Monitor, Maximize2 } from "lucide-react";
 // Import custom hooks
 import { useWebRTC } from "../hooks/useWebRTC";
 import { useScreenShare } from "../hooks/useScreenShare";
+import { useVideoRecording } from "../hooks/useVideoRecording";
+import { useScreenshot } from "../hooks/useScreenshot";
 import { useAuthState, useAuthActions } from "../stores/authStore";
 import { useChatActions, useChatStore } from "../stores/chatStore";
 
@@ -17,6 +19,8 @@ import ChatSidebar from "../components/chat/ChatSidebar";
 import MuteIndicators from "../components/room/MuteIndicators";
 import { MuteStateProvider } from "../components/room/MuteStateProvider";
 import RoomManagement from "../components/room/RoomManagement";
+import RecordingStatus from "../components/room/RecordingStatus";
+import ScreenshotGallery from "../components/room/ScreenshotGallery";
 
 // Import utilities
 import {
@@ -69,6 +73,7 @@ const RoomPage = () => {
   // Get user details from navigation state
   const username = location.state?.username;
   const password = location.state?.password;
+  const isCreating = location.state?.isCreating || false;
 
   // Hook 12: useWebRTC - WebRTC functionality (contains multiple internal hooks)
   const {
@@ -133,6 +138,25 @@ const RoomPage = () => {
     localStreamRef,
     socketReady
   );
+
+  // Hook 15: useVideoRecording - video recording functionality
+  const {
+    isRecording,
+    recordedBlobs,
+    recordingType,
+    startRecording,
+    stopRecording,
+    downloadRecording,
+    clearRecordings,
+  } = useVideoRecording();
+
+  // Hook 16: useScreenshot - screenshot functionality
+  const {
+    screenshots,
+    captureGridScreenshot,
+    downloadScreenshot,
+    clearScreenshots,
+  } = useScreenshot();
 
   // Hook 15: useEffect - navbar control
   useEffect(() => {
@@ -209,6 +233,7 @@ const RoomPage = () => {
           password,
           username,
           userId: isAuthenticated ? user.id : null,
+          isCreating: isCreating,
         });
 
         // Setup socket event listeners
@@ -303,6 +328,7 @@ const RoomPage = () => {
     roomId,
     username,
     password,
+    isCreating,
     navigate,
     initializeLocalStream,
     setupSocketListeners,
@@ -341,6 +367,48 @@ const RoomPage = () => {
     },
     [fullscreenStream]
   );
+
+  // Hook 17: useCallback - recording toggle handler
+  const handleToggleRecording = useCallback(async () => {
+    try {
+      if (isRecording) {
+        stopRecording();
+      } else {
+        // Start recording with local stream
+        if (localStreamRef.current) {
+          await startRecording(localStreamRef.current, "local");
+        } else {
+          alert("No video stream available for recording");
+        }
+      }
+    } catch (error) {
+      console.error("Error toggling recording:", error);
+      alert("Failed to toggle recording");
+    }
+  }, [isRecording, localStreamRef, startRecording, stopRecording]);
+
+  // Hook 18: useCallback - screenshot handler
+  const handleTakeScreenshot = useCallback(() => {
+    try {
+      // Get the main video container
+      const videoContainer = document.querySelector(
+        ".relative.w-screen.h-screen.bg-background.flex"
+      );
+
+      if (videoContainer) {
+        // Capture the entire video grid
+        captureGridScreenshot(
+          videoContainer,
+          `${roomId} - ${new Date().toLocaleTimeString()}`
+        );
+      } else {
+        alert("Video container not found");
+      }
+    } catch (error) {
+      console.error("Error taking screenshot:", error);
+      alert("Failed to take screenshot");
+    }
+  }, [roomId, captureGridScreenshot]);
 
   const leaveRoom = () => {
     console.log("Leaving room - starting AGGRESSIVE cleanup");
@@ -584,6 +652,11 @@ const RoomPage = () => {
             onLeaveRoom={leaveRoom}
             isAdmin={isAdmin}
             onOpenRoomManagement={() => setShowRoomManagement(true)}
+            // Recording props
+            isRecording={isRecording}
+            onToggleRecording={handleToggleRecording}
+            // Screenshot props
+            onTakeScreenshot={handleTakeScreenshot}
           />
 
           {/* Main grid for videos */}
@@ -623,6 +696,22 @@ const RoomPage = () => {
             onClose={() => setShowRoomManagement(false)}
           />
         )}
+
+        {/* Recording Status */}
+        <RecordingStatus
+          isRecording={isRecording}
+          recordedBlobs={recordedBlobs}
+          recordingType={recordingType}
+          onDownloadRecording={downloadRecording}
+          onClearRecordings={clearRecordings}
+        />
+
+        {/* Screenshot Gallery */}
+        <ScreenshotGallery
+          screenshots={screenshots}
+          onDownloadScreenshot={downloadScreenshot}
+          onClearScreenshots={clearScreenshots}
+        />
       </div>
     </MuteStateProvider>
   );

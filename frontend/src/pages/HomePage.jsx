@@ -35,18 +35,19 @@ const HomePage = () => {
     e.preventDefault();
     const displayUsername = isAuthenticated ? user?.username : username;
 
-    if (roomId.trim() && password.trim() && displayUsername.trim()) {
+    if (roomId.trim() && displayUsername.trim()) {
       // Navigate to the room page, passing user details in the state
       // to avoid exposing them in the URL.
       navigate(`/room/${roomId}`, {
         state: {
           username: displayUsername,
-          password,
+          password: password.trim() || null, // Allow empty password
+          isCreating: false, // This is for joining existing rooms
           from: "/", // Track where they came from
         },
       });
     } else {
-      alert("Please fill in all fields.");
+      alert("Please enter room ID and your name.");
     }
   };
 
@@ -151,16 +152,19 @@ const HomePage = () => {
                   htmlFor="password"
                   className="font-medium text-foreground"
                 >
-                  Password
+                  Password (Optional)
                 </Label>
                 <Input
                   id="password"
                   type="password"
-                  required
+                  placeholder="Leave empty for passwordless room"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="bg-input text-foreground border-border"
                 />
+                <p className="text-sm text-muted-foreground">
+                  Only required if the room has a password
+                </p>
               </div>
             </CardContent>
             <CardFooter>

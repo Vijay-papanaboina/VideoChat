@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "../ui/card";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { validateLogin, getFirstError } from "../../utils/validation";
 
 const LoginForm = ({ onSwitchToRegister, onSuccess }) => {
   const { login } = useAuthActions();
@@ -35,6 +36,13 @@ const LoginForm = ({ onSwitchToRegister, onSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLocalError("");
+
+    // Basic validation
+    const errors = validateLogin(formData);
+    if (errors.length > 0) {
+      setLocalError(getFirstError(errors));
+      return;
+    }
 
     const result = await login(formData);
     if (result.success) {

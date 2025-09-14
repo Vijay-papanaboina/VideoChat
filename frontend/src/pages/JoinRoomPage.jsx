@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import { Users, Lock, AlertCircle, CheckCircle } from "lucide-react";
+import { validateRoomJoin, getFirstError } from "../utils/validation";
 
 const JoinRoomPage = () => {
   const navigate = useNavigate();
@@ -76,10 +77,35 @@ const JoinRoomPage = () => {
 
     try {
       const displayUsername = isAuthenticated ? user?.username : username;
+
+      // Validate room join data
+      const roomData = {
+        roomId,
+        isAuthenticated,
+        username: displayUsername,
+      };
+      const errors = validateRoomJoin(roomData);
+      if (errors.length > 0) {
+        setError(getFirstError(errors));
+        setIsJoining(false);
+        return;
+      }
+
+      // Only require password if room info indicates it's needed
+      const passwordRequired = roomInfo?.requiresPassword;
+      const passwordValid = !passwordRequired || password.trim();
+
+      if (!passwordValid) {
+        setError("Password is required for this room.");
+        setIsJoining(false);
+        return;
+      }
+
       navigate(`/room/${roomId.trim().toUpperCase()}`, {
         state: {
           isJoining: true,
-          password: password,
+          isCreating: false, // This is for joining existing rooms
+          password: password.trim() || null, // Allow empty password for passwordless rooms
           username: displayUsername,
           from: "/join-room", // Track where they came from
         },
@@ -99,7 +125,8 @@ const JoinRoomPage = () => {
             Join a Room
           </h2>
           <p className="text-muted-foreground">
-            Enter the room ID and password to join an existing video call
+            Enter the room ID to join an existing video call. Password only
+            required if the room has one.
           </p>
         </div>
 
@@ -212,29 +239,52 @@ const JoinRoomPage = () => {
                 </div>
               )}
 
-              {roomInfo?.exists && roomInfo?.isActive && (
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder={
-                      roomInfo.requiresPassword
+              {/* Always show password field */}
+              <div className="space-y-2">
+                <Label htmlFor="password">
+                  Password{" "}
+                  {roomInfo?.exists &&
+                  roomInfo?.isActive &&
+                  !roomInfo.requiresPassword
+                    ? "(Optional)"
+                    : ""}
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={
+                    roomInfo?.exists && roomInfo?.isActive
+                      ? roomInfo.requiresPassword
                         ? "Enter room password"
-                        : "No password required"
-                    }
-                    disabled={isJoining}
-                    required={roomInfo.requiresPassword}
-                  />
-                  {!roomInfo.requiresPassword && (
-                    <p className="text-sm text-muted-foreground">
-                      This room doesn't require a password
+                        : "No password required - leave empty"
+                      : "Enter password if required"
+                  }
+                  disabled={isJoining}
+                  required={false}
+                />
+                {roomInfo?.exists &&
+                  roomInfo?.isActive &&
+                  !roomInfo.requiresPassword && (
+                    <p className="text-sm text-green-600 dark:text-green-400">
+                      ✅ This room doesn't require a password
                     </p>
                   )}
-                </div>
-              )}
+                {roomInfo?.exists &&
+                  roomInfo?.isActive &&
+                  roomInfo.requiresPassword && (
+                    <p className="text-sm text-orange-600 dark:text-orange-400">
+                      🔒 Password is required for this room
+                    </p>
+                  )}
+                {!roomInfo && (
+                  <p className="text-sm text-muted-foreground">
+                    Enter password if the room requires one, or leave empty for
+                    passwordless rooms
+                  </p>
+                )}
+              </div>
 
               <Button
                 type="submit"
@@ -242,9 +292,8 @@ const JoinRoomPage = () => {
                 disabled={
                   isJoining ||
                   !roomId ||
-                  !roomInfo?.exists ||
-                  !roomInfo?.isActive ||
-                  (!isAuthenticated && !username)
+                  (!isAuthenticated && !username) ||
+                  (roomInfo?.exists && !roomInfo?.isActive)
                 }
               >
                 {isJoining ? "Joining Room..." : "Join Room"}

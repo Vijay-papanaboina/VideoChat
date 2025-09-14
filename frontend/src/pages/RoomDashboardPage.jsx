@@ -19,7 +19,6 @@ import {
   Crown,
   LogOut,
   Edit,
-  UserMinus,
 } from "lucide-react";
 import io from "socket.io-client";
 import CreatePermanentRoomModal from "../components/modals/CreatePermanentRoomModal";
@@ -103,7 +102,7 @@ const RoomManagementPage = () => {
       state: {
         username: user?.username,
         password: null,
-        isPermanentRoom: true,
+        isCreating: false, // This is for joining existing permanent rooms
         from: "/rooms", // Track where they came from
       },
     });

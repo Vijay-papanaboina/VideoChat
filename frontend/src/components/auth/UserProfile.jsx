@@ -94,8 +94,8 @@ const UserProfile = ({ isOpen, onClose }) => {
     setError("");
     setSuccess("");
 
-    // TODO: Implement changePassword in auth store
-    setError("Password change not implemented yet");
+    // Password change functionality is implemented in UserProfilePage
+    setError("Use the main profile page to change your password");
     setLoading(false);
   };
 
@@ -111,8 +111,8 @@ const UserProfile = ({ isOpen, onClose }) => {
       return;
     }
 
-    // TODO: Implement deleteAccount in auth store
-    setError("Account deletion not implemented yet");
+    // Account deletion functionality is implemented in UserProfilePage
+    setError("Use the main profile page to delete your account");
     setLoading(false);
   };
 

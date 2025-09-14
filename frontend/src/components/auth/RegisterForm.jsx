@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "../ui/card";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { validateRegistration, getFirstError } from "../../utils/validation";
 
 const RegisterForm = ({ onSwitchToLogin, onSuccess }) => {
   const { register } = useAuthActions();
@@ -39,16 +40,9 @@ const RegisterForm = ({ onSwitchToLogin, onSuccess }) => {
   };
 
   const validateForm = () => {
-    if (formData.password !== formData.confirmPassword) {
-      setLocalError("Passwords do not match");
-      return false;
-    }
-    if (formData.password.length < 6) {
-      setLocalError("Password must be at least 6 characters long");
-      return false;
-    }
-    if (formData.username.length < 3) {
-      setLocalError("Username must be at least 3 characters long");
+    const errors = validateRegistration(formData);
+    if (errors.length > 0) {
+      setLocalError(getFirstError(errors));
       return false;
     }
     return true;

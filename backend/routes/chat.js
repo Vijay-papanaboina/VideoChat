@@ -2,8 +2,8 @@ import express from "express";
 import * as chatController from "../src/controllers/chatController.js";
 import { authenticateToken } from "../src/middleware/auth.js";
 import {
-  validatePagination,
-  validateDateRange,
+  validatePaginationMiddleware,
+  validateDateRangeMiddleware,
 } from "../src/middleware/validation.js";
 
 const router = express.Router();
@@ -17,12 +17,16 @@ router.get("/room/:roomId/count", chatController.getRoomMessageCount);
 router.use(authenticateToken);
 
 // Message routes
-router.get("/room/:roomId", validatePagination, chatController.getRoomMessages);
+router.get(
+  "/room/:roomId",
+  validatePaginationMiddleware,
+  chatController.getRoomMessages
+);
 router.get("/room/:roomId/search", chatController.searchMessages);
 router.get("/room/:roomId/activity", chatController.getRoomActivitySummary);
 router.get(
   "/room/:roomId/by-date-range",
-  validateDateRange,
+  validateDateRangeMiddleware,
   chatController.getMessagesByDateRange
 );
 
@@ -34,7 +38,7 @@ router.delete("/message/:messageId", chatController.deleteMessage);
 // User message routes
 router.get(
   "/user/messages",
-  validatePagination,
+  validatePaginationMiddleware,
   chatController.getUserMessages
 );
 

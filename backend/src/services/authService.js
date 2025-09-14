@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { eq, and, desc, or, ilike, ne, notInArray } from "drizzle-orm";
 import { db } from "../db.js";
 import { users, userSessions } from "../schema.js";
+import { validateUserRegistration } from "../utils/validation.js";
 
 const JWT_SECRET =
   process.env.JWT_SECRET || "your-super-secret-jwt-key-change-in-production";
@@ -360,26 +361,10 @@ export const sanitizeUser = (user) => {
 };
 
 export const validateUserData = (userData) => {
-  const { username, email, password, firstName, lastName } = userData;
+  const errors = validateUserRegistration(userData);
 
-  if (!username || username.length < UserValidation.username.minLength) {
-    throw new Error("Username must be at least 3 characters long");
-  }
-
-  if (!email || !UserValidation.email.pattern.test(email)) {
-    throw new Error("Invalid email format");
-  }
-
-  if (!password || password.length < UserValidation.password.minLength) {
-    throw new Error("Password must be at least 8 characters long");
-  }
-
-  if (!firstName || firstName.length < UserValidation.firstName.minLength) {
-    throw new Error("First name is required");
-  }
-
-  if (!lastName || lastName.length < UserValidation.lastName.minLength) {
-    throw new Error("Last name is required");
+  if (errors.length > 0) {
+    throw new Error(errors[0]); // Throw first error
   }
 };
 

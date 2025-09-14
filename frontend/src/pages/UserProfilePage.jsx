@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import { Loader2, User, Mail, Calendar, Save, Key } from "lucide-react";
+import { validatePasswordChange, getFirstError } from "../utils/validation";
 
 const UserProfilePage = () => {
   const { user, isAuthenticated } = useAuthState();
@@ -85,13 +86,9 @@ const UserProfilePage = () => {
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
 
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setError("New passwords do not match");
-      return;
-    }
-
-    if (passwordData.newPassword.length < 6) {
-      setError("New password must be at least 6 characters long");
+    const errors = validatePasswordChange(passwordData);
+    if (errors.length > 0) {
+      setError(getFirstError(errors));
       return;
     }
 

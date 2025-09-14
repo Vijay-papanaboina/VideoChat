@@ -8,6 +8,9 @@ import {
   PhoneOff,
   MessageCircle,
   Settings,
+  Circle,
+  Square,
+  Camera,
 } from "lucide-react";
 
 /**
@@ -27,6 +30,11 @@ const MediaControls = ({
   onLeaveRoom,
   isAdmin,
   onOpenRoomManagement,
+  // Recording props
+  isRecording,
+  onToggleRecording,
+  // Screenshot props
+  onTakeScreenshot,
 }) => {
   return (
     <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">
@@ -97,6 +105,34 @@ const MediaControls = ({
           aria-label="Toggle chat"
         >
           <MessageCircle className="w-5 h-5" />
+        </button>
+
+        {/* Recording Button */}
+        <button
+          onClick={onToggleRecording}
+          className={`p-3 rounded-full transition-all duration-200 ${
+            isRecording
+              ? "bg-red-600 hover:bg-red-700 text-foreground animate-pulse"
+              : "bg-muted hover:bg-muted/80 text-foreground"
+          }`}
+          aria-label={isRecording ? "Stop recording" : "Start recording"}
+          title={isRecording ? "Stop recording" : "Start recording"}
+        >
+          {isRecording ? (
+            <Square className="w-5 h-5" />
+          ) : (
+            <Circle className="w-5 h-5" />
+          )}
+        </button>
+
+        {/* Screenshot Button */}
+        <button
+          onClick={onTakeScreenshot}
+          className="p-3 rounded-full bg-muted hover:bg-muted/80 text-foreground transition-all duration-200"
+          aria-label="Take screenshot"
+          title="Take screenshot"
+        >
+          <Camera className="w-5 h-5" />
         </button>
 
         {/* Room Management Button (Admin Only) */}

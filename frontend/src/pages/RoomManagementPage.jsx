@@ -133,7 +133,7 @@ const RoomManagementPage = () => {
       state: {
         username: user?.username,
         password: null,
-        isPermanentRoom: true,
+        isCreating: false, // This is for joining existing permanent rooms
         from: `/room/manage/${roomId}`, // Track where they came from
       },
     });

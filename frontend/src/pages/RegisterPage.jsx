@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
+import { validatePasswordMatch, getFirstError } from "../utils/validation";
 
 const RegisterPage = () => {
   const [formData, setFormData] = useState({
@@ -36,8 +37,13 @@ const RegisterPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (formData.password !== formData.confirmPassword) {
-      alert("Passwords do not match");
+    // Basic validation - let backend handle detailed validation
+    const passwordErrors = validatePasswordMatch(
+      formData.password,
+      formData.confirmPassword
+    );
+    if (passwordErrors.length > 0) {
+      alert(getFirstError(passwordErrors));
       return;
     }
 

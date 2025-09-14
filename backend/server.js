@@ -122,12 +122,22 @@ io.on("connection", (socket) => {
 
   // Event listener for a user joining a room
   socket.on("join-room", async (data) => {
-    const { roomId, password, username, userId = null } = data;
+    const {
+      roomId,
+      password,
+      username,
+      userId = null,
+      isCreating = false,
+    } = data;
 
     // --- Room Validation ---
     // If the room doesn't exist in memory, check database and create if needed
     if (!rooms[roomId]) {
-      const isPermanentRoom = userId !== null; // Permanent rooms are created by logged-in users
+      // Determine room type based on context:
+      // - isCreating=true: Temporary room (from /room/create)
+      // - isCreating=false + userId=null: Anonymous user joining temporary room
+      // - isCreating=false + userId!=null: Logged-in user joining permanent room
+      const isPermanentRoom = !isCreating && userId !== null;
 
       if (isPermanentRoom) {
         // Check if permanent room exists in database
@@ -208,7 +218,17 @@ io.on("connection", (socket) => {
       }
     } else {
       // For temporary rooms, check password
-      if (rooms[roomId].password !== password) {
+      const roomPassword = rooms[roomId].password;
+      const userPassword = password;
+
+      // Both should be either null/undefined or match exactly
+      const roomHasPassword = roomPassword && roomPassword.trim() !== "";
+      const userProvidedPassword = userPassword && userPassword.trim() !== "";
+
+      if (
+        roomHasPassword !== userProvidedPassword ||
+        (roomHasPassword && roomPassword !== userPassword)
+      ) {
         socket.emit("join-error", { message: "Invalid room password." });
         console.log(`🚫 Invalid password for room ${roomId} from ${socket.id}`);
         return;
