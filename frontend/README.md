@@ -1,6 +1,6 @@
-# VideoCall App
+# VideoCallApp Frontend
 
-A modern, real-time video calling application built with React, Socket.IO, and WebRTC. Features secure room-based video calls with up to 5 participants.
+React + Vite client for the VideoCallApp. Connects to the backend via REST and Socket.IO, implements WebRTC media sessions, and provides a responsive UI with Tailwind and shadcn/ui.
 
 ## Features
 
@@ -16,19 +16,16 @@ A modern, real-time video calling application built with React, Socket.IO, and W
 
 ### Frontend
 
-- **React 19** - Modern React with hooks
-- **Vite** - Fast build tool and dev server
-- **Tailwind CSS** - Utility-first CSS framework
-- **shadcn/ui** - Beautiful, accessible UI components
-- **Socket.IO Client** - Real-time communication
-- **WebRTC** - Peer-to-peer video/audio streaming
+- React (Vite)
+- Tailwind CSS
+- shadcn/ui
+- Socket.IO Client
+- WebRTC
 
 ### Backend
 
-- **Node.js** - JavaScript runtime
-- **Express** - Web framework
-- **Socket.IO** - Real-time bidirectional communication
-- **CORS** - Cross-origin resource sharing
+- Node.js + Express + Socket.IO
+- Drizzle ORM (PostgreSQL)
 
 ## Project Structure
 
@@ -167,7 +164,10 @@ The frontend uses Vite environment variables to configure the backend URL. Creat
 VITE_BACKEND_URL=http://localhost:8000
 ```
 
-**Note**: The application will fallback to `http://localhost:8000` if no environment variable is set.
+Notes:
+
+- `VITE_` prefix is required for Vite to expose variables to the client.
+- In development, ensure this matches the backend port (default http://localhost:8000).
 
 ### Backend Configuration
 
