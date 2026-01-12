@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { useMuteState } from "../../contexts/MuteStateContext";
+import { useChatStore } from "../../stores/chatStore";
 import MediaControls from "./MediaControls";
 
 /**
@@ -24,6 +25,7 @@ const MediaControlsWrapper = memo(
   }) => {
     const { isAudioMuted, isVideoMuted, toggleAudio, toggleVideo } =
       useMuteState();
+    const unreadCount = useChatStore((state) => state.unreadCount);
 
     return (
       <MediaControls
@@ -44,6 +46,8 @@ const MediaControlsWrapper = memo(
         onToggleRecording={onToggleRecording}
         // Screenshot props
         onTakeScreenshot={onTakeScreenshot}
+        // Unread messages
+        unreadCount={unreadCount}
       />
     );
   }

@@ -22,13 +22,14 @@ export const useChatStore = create((set) => ({
   currentRoomId: null,
   isTyping: false,
   typingUsers: [],
+  unreadCount: 0, // Track unread messages
 
   // Actions
   setCurrentRoom: (roomId) => {
     set((state) => {
       // Only clear messages if room actually changed
       if (state.currentRoomId !== roomId) {
-        return { currentRoomId: roomId, messages: [] };
+        return { currentRoomId: roomId, messages: [], unreadCount: 0 };
       } else {
         return { currentRoomId: roomId };
       }
@@ -38,7 +39,11 @@ export const useChatStore = create((set) => ({
   addMessage: (message) => {
     set((state) => {
       const newMessages = [...state.messages, message];
-      return { messages: newMessages };
+      // Increment unread if chat is closed
+      const newUnreadCount = state.isChatOpen
+        ? state.unreadCount
+        : state.unreadCount + 1;
+      return { messages: newMessages, unreadCount: newUnreadCount };
     });
   },
 
@@ -53,15 +58,19 @@ export const useChatStore = create((set) => ({
   },
 
   clearMessages: () => {
-    set({ messages: [] });
+    set({ messages: [], unreadCount: 0 });
   },
 
   toggleChat: () => {
-    set((state) => ({ isChatOpen: !state.isChatOpen }));
+    set((state) => ({
+      isChatOpen: !state.isChatOpen,
+      // Reset unread count when opening chat
+      unreadCount: !state.isChatOpen ? 0 : state.unreadCount,
+    }));
   },
 
   setChatOpen: (isOpen) => {
-    set({ isChatOpen: isOpen });
+    set({ isChatOpen: isOpen, unreadCount: isOpen ? 0 : undefined });
   },
 
   setTyping: (isTyping) => {
@@ -82,6 +91,10 @@ export const useChatStore = create((set) => ({
 
   clearTypingUsers: () => {
     set({ typingUsers: [] });
+  },
+
+  resetUnreadCount: () => {
+    set({ unreadCount: 0 });
   },
 }));
 
@@ -122,8 +135,14 @@ export const useChatActions = () => {
  * Hook for chat state
  */
 export const useChatState = () => {
-  const { messages, isChatOpen, currentRoomId, isTyping, typingUsers } =
-    useChatStore();
+  const {
+    messages,
+    isChatOpen,
+    currentRoomId,
+    isTyping,
+    typingUsers,
+    unreadCount,
+  } = useChatStore();
 
   return {
     messages,
@@ -131,5 +150,6 @@ export const useChatState = () => {
     currentRoomId,
     isTyping,
     typingUsers,
+    unreadCount,
   };
 };

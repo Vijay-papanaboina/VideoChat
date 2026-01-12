@@ -13,6 +13,14 @@ const router = express.Router();
 router.post("/register", authController.register);
 router.post("/login", validateLogin, authController.login);
 
+// Email verification routes (public)
+router.get("/verify-email/:token", authController.verifyEmail);
+router.post("/resend-verification", authController.resendVerification);
+
+// Password reset routes (public)
+router.post("/forgot-password", authController.forgotPassword);
+router.post("/reset-password/:token", authController.resetPassword);
+
 // Protected routes
 router.use(authenticateToken);
 router.post("/logout", authController.logout);

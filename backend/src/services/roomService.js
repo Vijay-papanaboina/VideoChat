@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, lt } from "drizzle-orm";
 import { db } from "../db.js";
 import {
   temporaryRooms,
@@ -13,6 +13,32 @@ import {
 } from "../schema.js";
 
 // ===== TEMPORARY ROOM FUNCTIONS =====
+
+// Delete expired temporary rooms
+export const deleteExpiredTemporaryRooms = async () => {
+  try {
+    const deletedRooms = await db
+      .delete(temporaryRooms)
+      .where(lt(temporaryRooms.expiresAt, new Date()))
+      .returning();
+
+    if (deletedRooms.length > 0) {
+      console.log(
+        `🧹 Cleaned up ${deletedRooms.length} expired temporary rooms`
+      );
+
+      // Note: Related chat sessions/messages should cascade delete if FK set up,
+      // or we might need to manually clean them up if not.
+      // Drizzle doesn't automatically cascade unless FK constraint exists in DB.
+      // For now assuming DB level cascade or minimal orphan data acceptable.
+    }
+
+    return deletedRooms.length;
+  } catch (error) {
+    console.error("❌ Failed to delete expired temporary rooms:", error);
+    return 0;
+  }
+};
 
 // Create a temporary room in the database
 export const createTemporaryRoom = async (roomId, password, createdBy) => {

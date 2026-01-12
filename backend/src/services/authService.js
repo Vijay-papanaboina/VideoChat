@@ -5,6 +5,12 @@ import { eq, and, desc, or, ilike, ne, notInArray } from "drizzle-orm";
 import { db } from "../db.js";
 import { users, userSessions } from "../schema.js";
 import { validateUserRegistration } from "../utils/validation.js";
+import {
+  generateToken as generateEmailToken,
+  generateExpiry,
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+} from "./emailService.js";
 
 const JWT_SECRET =
   process.env.JWT_SECRET || "your-super-secret-jwt-key-change-in-production";
@@ -174,6 +180,10 @@ export const register = async (userData) => {
   const salt = await bcrypt.genSalt(12);
   const hashedPassword = await bcrypt.hash(password, salt);
 
+  // Generate verification token
+  const verificationToken = generateEmailToken();
+  const verificationTokenExpiry = generateExpiry(24); // 24 hours
+
   // Create user data
   const newUserData = {
     username,
@@ -190,6 +200,8 @@ export const register = async (userData) => {
     lastActive: new Date(),
     isVerified: false,
     isActive: true,
+    verificationToken,
+    verificationTokenExpiry,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -197,7 +209,12 @@ export const register = async (userData) => {
   // Create user
   const user = await createUser(newUserData);
 
-  // Generate token
+  // Send verification email (async, don't block registration)
+  sendVerificationEmail(email, username, verificationToken).catch((err) => {
+    console.error("Failed to send verification email:", err);
+  });
+
+  // Generate token for session
   const token = generateToken(user.id);
 
   // Store session
@@ -206,6 +223,8 @@ export const register = async (userData) => {
   return {
     user: sanitizeUser(user),
     token,
+    message:
+      "Registration successful! Please check your email to verify your account.",
   };
 };
 
@@ -228,6 +247,21 @@ export const login = async (email, password) => {
     throw new Error("Invalid email or password");
   }
 
+  // Check if email is verified (optional: can be made required)
+  if (!user.isVerified) {
+    // Resend verification email if not verified
+    const verificationToken = generateEmailToken();
+    const verificationTokenExpiry = generateExpiry(24);
+    await updateUser(user.id, { verificationToken, verificationTokenExpiry });
+    sendVerificationEmail(email, user.username, verificationToken).catch(
+      console.error
+    );
+
+    throw new Error(
+      "Email not verified. A new verification email has been sent."
+    );
+  }
+
   // Update last active
   await updateUser(user.id, { lastActive: new Date() });
 
@@ -240,6 +274,127 @@ export const login = async (email, password) => {
   return {
     user: sanitizeUser(user),
     token,
+  };
+};
+
+// Verify email
+export const verifyEmail = async (token) => {
+  // Find user by verification token
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.verificationToken, token))
+    .limit(1);
+
+  if (!user) {
+    throw new Error("Invalid verification token");
+  }
+
+  // Check if token is expired
+  if (
+    user.verificationTokenExpiry &&
+    new Date() > user.verificationTokenExpiry
+  ) {
+    throw new Error(
+      "Verification token has expired. Please request a new one."
+    );
+  }
+
+  // Mark email as verified
+  await updateUser(user.id, {
+    isVerified: true,
+    verificationToken: null,
+    verificationTokenExpiry: null,
+  });
+
+  return { message: "Email verified successfully! You can now log in." };
+};
+
+// Resend verification email
+export const resendVerificationEmail = async (email) => {
+  const user = await findUserByEmail(email);
+  if (!user) {
+    // Don't reveal if email exists
+    return {
+      message: "If this email exists, a verification link has been sent.",
+    };
+  }
+
+  if (user.isVerified) {
+    throw new Error("Email is already verified");
+  }
+
+  const verificationToken = generateEmailToken();
+  const verificationTokenExpiry = generateExpiry(24);
+
+  await updateUser(user.id, { verificationToken, verificationTokenExpiry });
+  await sendVerificationEmail(email, user.username, verificationToken);
+
+  return { message: "Verification email sent successfully" };
+};
+
+// Forgot password - send reset email
+export const forgotPassword = async (email) => {
+  const user = await findUserByEmail(email);
+
+  // Always return success message to prevent email enumeration
+  if (!user) {
+    return {
+      message: "If this email exists, a password reset link has been sent.",
+    };
+  }
+
+  const resetToken = generateEmailToken();
+  const resetTokenExpiry = generateExpiry(1); // 1 hour
+
+  await updateUser(user.id, { resetToken, resetTokenExpiry });
+  await sendPasswordResetEmail(email, user.username, resetToken);
+
+  return {
+    message: "If this email exists, a password reset link has been sent.",
+  };
+};
+
+// Reset password with token
+export const resetPassword = async (token, newPassword) => {
+  // Find user by reset token
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.resetToken, token))
+    .limit(1);
+
+  if (!user) {
+    throw new Error("Invalid reset token");
+  }
+
+  // Check if token is expired
+  if (user.resetTokenExpiry && new Date() > user.resetTokenExpiry) {
+    throw new Error("Reset token has expired. Please request a new one.");
+  }
+
+  // Validate new password
+  if (newPassword.length < 8) {
+    throw new Error("Password must be at least 8 characters long");
+  }
+
+  // Hash new password
+  const salt = await bcrypt.genSalt(12);
+  const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+  // Update password and clear reset token
+  await updateUser(user.id, {
+    password: hashedPassword,
+    resetToken: null,
+    resetTokenExpiry: null,
+  });
+
+  // Clear all sessions for security
+  await deleteAllUserSessions(user.id);
+
+  return {
+    message:
+      "Password reset successfully. Please log in with your new password.",
   };
 };
 
@@ -377,6 +532,12 @@ export const authService = {
   updateProfile,
   changePassword,
   deleteAccount,
+  // Email verification
+  verifyEmail,
+  resendVerificationEmail,
+  // Password reset
+  forgotPassword,
+  resetPassword,
   // Data access functions
   createUser,
   findUserById,

@@ -21,6 +21,7 @@ import { MuteStateProvider } from "../components/room/MuteStateProvider";
 import RoomManagement from "../components/room/RoomManagement";
 import RecordingStatus from "../components/room/RecordingStatus";
 import ScreenshotGallery from "../components/room/ScreenshotGallery";
+import KeyboardShortcutsHandler from "../components/room/KeyboardShortcutsHandler";
 
 // Import utilities
 import {
@@ -631,6 +632,11 @@ const RoomPage = () => {
 
   return (
     <MuteStateProvider localStreamRef={localStreamRef}>
+      {/* Keyboard shortcuts handler */}
+      <KeyboardShortcutsHandler
+        onToggleScreenShare={toggleScreenShare}
+        isScreenSharing={isScreenSharing}
+      />
       <div className="relative w-screen h-screen bg-background flex">
         {/* Main video area */}
         <div className={`relative h-full ${isChatOpen ? "flex-1" : "w-full"}`}>

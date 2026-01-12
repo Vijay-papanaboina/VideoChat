@@ -2,12 +2,38 @@
  * WebRTC configuration and utilities
  */
 
+// TURN server credentials from environment (for production reliability)
+const TURN_USERNAME = import.meta.env.VITE_TURN_USERNAME;
+const TURN_CREDENTIAL = import.meta.env.VITE_TURN_CREDENTIAL;
+const TURN_SERVER = import.meta.env.VITE_TURN_SERVER || "a.relay.metered.ca";
+
 export const ICE_SERVERS = {
   iceServers: [
+    // STUN servers (free, for NAT traversal)
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
     { urls: "stun:stun2.l.google.com:19302" },
-    { urls: "stun:stun3.l.google.com:19302" },
+    // TURN servers (for restrictive firewalls/symmetric NAT)
+    // Only add if credentials are configured
+    ...(TURN_USERNAME && TURN_CREDENTIAL
+      ? [
+          {
+            urls: `turn:${TURN_SERVER}:80`,
+            username: TURN_USERNAME,
+            credential: TURN_CREDENTIAL,
+          },
+          {
+            urls: `turn:${TURN_SERVER}:443`,
+            username: TURN_USERNAME,
+            credential: TURN_CREDENTIAL,
+          },
+          {
+            urls: `turn:${TURN_SERVER}:443?transport=tcp`,
+            username: TURN_USERNAME,
+            credential: TURN_CREDENTIAL,
+          },
+        ]
+      : []),
   ],
   // Enhanced configuration for better quality
   iceCandidatePoolSize: 10,

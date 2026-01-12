@@ -1,0 +1,52 @@
+version: "3.8"
+
+services:
+  # Database Service
+  db:
+    image: postgres:15-alpine
+    container_name: videocall-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
+      - POSTGRES_DB=${DB_NAME:-videocall}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: videocall-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - DB_HOST=db
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_NAME=${DB_NAME:-videocall}
+      - DB_PORT=5432
+      - CORS_ORIGIN=http://localhost:4000
+      - JWT_SECRET=${JWT_SECRET:-super_secret_jwt_key_videoapp_2024}
+      - NODE_ENV=production
+    depends_on:
+      - db
+    volumes:
+      - ./backend/uploads:/app/uploads
+
+  # Frontend UI
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: videocall-frontend
+    ports:
+      - "4000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

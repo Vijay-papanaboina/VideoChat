@@ -16,6 +16,9 @@ import CreateRoomPage from "./pages/CreateRoomPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import JoinRoomPage from "./pages/JoinRoomPage";
+import VerifyEmailPage from "./pages/VerifyEmailPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 
 function App() {
   const { checkAuth } = useAuthActions();
@@ -37,6 +40,14 @@ function App() {
             <Route path="/room/:roomId" element={<RoomPage />} />
             <Route path="/room/create" element={<CreateRoomPage />} />
             <Route path="/room/join" element={<JoinRoomPage />} />
+
+            {/* Email verification and password reset (public) */}
+            <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route
+              path="/reset-password/:token"
+              element={<ResetPasswordPage />}
+            />
 
             {/* Auth-only Public Routes (redirect authenticated users) */}
             <Route

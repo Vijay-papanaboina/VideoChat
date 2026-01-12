@@ -35,6 +35,8 @@ const MediaControls = ({
   onToggleRecording,
   // Screenshot props
   onTakeScreenshot,
+  // Unread messages
+  unreadCount = 0,
 }) => {
   return (
     <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">
@@ -48,6 +50,7 @@ const MediaControls = ({
               : "bg-muted hover:bg-muted/80 text-foreground"
           }`}
           aria-label={isAudioMuted ? "Unmute audio" : "Mute audio"}
+          title={`${isAudioMuted ? "Unmute" : "Mute"} (M)`}
         >
           {isAudioMuted ? (
             <MicOff className="w-5 h-5" />
@@ -65,6 +68,7 @@ const MediaControls = ({
               : "bg-muted hover:bg-muted/80 text-foreground"
           }`}
           aria-label={isVideoMuted ? "Turn on video" : "Turn off video"}
+          title={`${isVideoMuted ? "Turn on" : "Turn off"} video (V)`}
         >
           {isVideoMuted ? (
             <VideoOff className="w-5 h-5" />
@@ -85,6 +89,7 @@ const MediaControls = ({
             aria-label={
               isScreenSharing ? "Stop screen sharing" : "Start screen sharing"
             }
+            title={`${isScreenSharing ? "Stop" : "Start"} screen share (S)`}
           >
             {isScreenSharing ? (
               <MonitorOff className="w-5 h-5" />
@@ -94,17 +99,24 @@ const MediaControls = ({
           </button>
         )}
 
-        {/* Chat Toggle Button */}
+        {/* Chat Toggle Button with Unread Badge */}
         <button
           onClick={onToggleChat}
-          className={`p-3 rounded-full transition-all duration-200 ${
+          className={`relative p-3 rounded-full transition-all duration-200 ${
             isChatOpen
               ? "bg-blue-600 hover:bg-blue-700 text-foreground"
               : "bg-muted hover:bg-muted/80 text-foreground"
           }`}
           aria-label="Toggle chat"
+          title={`Toggle chat (C)`}
         >
           <MessageCircle className="w-5 h-5" />
+          {/* Unread Badge */}
+          {unreadCount > 0 && !isChatOpen && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
         </button>
 
         {/* Recording Button */}

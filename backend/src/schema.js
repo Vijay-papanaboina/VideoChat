@@ -28,6 +28,12 @@ export const users = pgTable("users", {
   lastActive: timestamp("last_active").defaultNow(),
   isVerified: boolean("is_verified").default(false),
   isActive: boolean("is_active").default(true),
+  // Email verification fields
+  verificationToken: varchar("verification_token", { length: 255 }),
+  verificationTokenExpiry: timestamp("verification_token_expiry"),
+  // Password reset fields
+  resetToken: varchar("reset_token", { length: 255 }),
+  resetTokenExpiry: timestamp("reset_token_expiry"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

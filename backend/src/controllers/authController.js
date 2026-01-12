@@ -255,3 +255,119 @@ export const searchUsers = async (req, res) => {
     });
   }
 };
+
+// Verify email
+export const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: "Verification token is required",
+      });
+    }
+
+    const result = await authService.verifyEmail(token);
+
+    res.json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error) {
+    console.error("Email verification error:", error);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Resend verification email
+export const resendVerification = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    const result = await authService.resendVerificationEmail(email);
+
+    res.json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error) {
+    console.error("Resend verification error:", error);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Forgot password
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    const result = await authService.forgotPassword(email);
+
+    res.json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to process request",
+    });
+  }
+};
+
+// Reset password
+export const resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: "Reset token is required",
+      });
+    }
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: "New password is required",
+      });
+    }
+
+    const result = await authService.resetPassword(token, password);
+
+    res.json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
