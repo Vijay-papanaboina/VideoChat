@@ -118,7 +118,9 @@ export const registerRoomHandlers = (socket, io) => {
       const userPassword = password;
 
       const roomHasPassword = roomPassword !== null;
-      const userProvidedPassword = userPassword && userPassword.trim() !== "";
+      const userProvidedPassword = !!(
+        userPassword && userPassword.trim() !== ""
+      );
 
       // Check if password requirements match
       if (roomHasPassword !== userProvidedPassword) {

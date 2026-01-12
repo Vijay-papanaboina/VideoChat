@@ -21,6 +21,8 @@ import { MuteStateProvider } from "../components/room/MuteStateProvider";
 import RoomManagement from "../components/room/RoomManagement";
 import RecordingStatus from "../components/room/RecordingStatus";
 import ScreenshotGallery from "../components/room/ScreenshotGallery";
+import LoadingScreen from "../components/room/LoadingScreen";
+import ErrorScreen from "../components/room/ErrorScreen";
 import KeyboardShortcutsHandler from "../components/room/KeyboardShortcutsHandler";
 
 // Import utilities
@@ -71,6 +73,10 @@ const RoomPage = () => {
   // Hook 11: useState - room management modal
   const [showRoomManagement, setShowRoomManagement] = useState(false);
 
+  // New State: Connection Status Machine
+  const [connectionStatus, setConnectionStatus] = useState("connecting"); // 'connecting', 'connected', 'error'
+  const [errorMessage, setErrorMessage] = useState(null);
+
   // Get user details from navigation state or authenticated user
   const username = location.state?.username || user?.username;
   const password = location.state?.password;
@@ -85,6 +91,7 @@ const RoomPage = () => {
     localStreamReady,
     initializeLocalStream,
     setupSocketListeners,
+    handleAllUsers,
     cleanup,
   } = useWebRTC(socketRef);
 
@@ -230,60 +237,76 @@ const RoomPage = () => {
       setSocketReady(true);
     });
 
-    // Initialize local stream and setup
-    initializeLocalStream()
-      .then(() => {
-        // Emit 'join-room' event with user details
-        socketRef.current.emit("join-room", {
-          roomId,
-          password,
-          username,
-          userId: isAuthenticated ? user.id : null,
-          isCreating: isCreating,
+    // Handle Connection State Updates
+    // 1. Success - Server sends all-users
+    socketRef.current.on("all-users", (users) => {
+      console.log("✅ Joined room successfully - Initializing media");
+      setConnectionStatus("connected");
+      // ONLY initialize media after successful join logic
+      initializeLocalStream()
+        .then(() => {
+          // Stream is ready, now setup P2P connections
+          setupSocketListeners();
+          handleAllUsers(users); // Manually trigger processing of existing users
+        })
+        .catch((error) => {
+          console.error("Error getting user media:", error);
+          setErrorMessage(
+            "Could not access camera/microphone. Please check permissions."
+          );
+          setConnectionStatus("error");
         });
+    });
 
-        // Setup socket event listeners
-        setupSocketListeners();
+    // 2. Failure - Server sends join-error
+    socketRef.current.on("join-error", ({ message }) => {
+      console.error("❌ Join error:", message);
+      setErrorMessage(message);
+      setConnectionStatus("error");
+      // Do not navigate away, let user read message
+    });
 
-        // Admin status tracking
-        socketRef.current.on("user-joined", (data) => {
-          // Check if the joined user is the current user and if they're admin
-          if (data.username === username && data.isAdmin) {
-            setIsAdmin(true);
-          }
-        });
+    // 3. Room Full
+    socketRef.current.on("room-full", () => {
+      console.error("❌ Room full");
+      setErrorMessage("This room is full (max 5 users).");
+      setConnectionStatus("error");
+    });
 
-        // Listen for admin promotion/demotion
-        socketRef.current.on("promoted-to-admin", () => {
-          setIsAdmin(true);
-        });
+    // 4. Kicked
+    socketRef.current.on("kicked-from-room", ({ message }) => {
+      setErrorMessage(message || "You have been kicked from the room.");
+      setConnectionStatus("error");
+      forceStopAllTracks(); // Stop media immediately
+    });
 
-        socketRef.current.on("demoted-from-admin", () => {
-          setIsAdmin(false);
-        });
+    // Emit 'join-room' event with user details
+    socketRef.current.emit("join-room", {
+      roomId,
+      password,
+      username,
+      userId: isAuthenticated ? user.id : null,
+      isCreating: isCreating,
+    });
 
-        // Listen for being kicked
-        socketRef.current.on("kicked-from-room", (data) => {
-          alert(data.message);
-          navigate("/");
-        });
+    // setupSocketListeners moved to inside all-users handler
 
-        // Error handlers
-        socketRef.current.on("room-full", () => {
-          alert("This room is full (max 5 users).");
-          navigate("/");
-        });
+    // Admin status tracking
+    socketRef.current.on("user-joined", (data) => {
+      // Check if the joined user is the current user and if they're admin
+      if (data.username === username && data.isAdmin) {
+        setIsAdmin(true);
+      }
+    });
 
-        socketRef.current.on("join-error", (error) => {
-          alert(`Error joining room: ${error.message}`);
-          navigate("/");
-        });
-      })
-      .catch((error) => {
-        console.error("Error getting user media:", error);
-        alert("Could not access camera and microphone.");
-        navigate("/");
-      });
+    // Listen for admin promotion/demotion
+    socketRef.current.on("promoted-to-admin", () => {
+      setIsAdmin(true);
+    });
+
+    socketRef.current.on("demoted-from-admin", () => {
+      setIsAdmin(false);
+    });
 
     // Cleanup function on component unmount
     return () => {
@@ -469,9 +492,14 @@ const RoomPage = () => {
       "AGGRESSIVE cleanup completed, navigating back to previous page"
     );
 
-    // Navigate back to where the user came from
-    const previousPath = location.state?.from || "/rooms";
-    navigate(previousPath);
+    // Navigate based on auth status
+    // Logged in users -> Dashboard (/rooms)
+    // Guest users -> Landing Page (/)
+    if (isAuthenticated) {
+      navigate("/rooms");
+    } else {
+      navigate("/");
+    }
   };
 
   // Dynamic Layout Calculation
@@ -637,6 +665,20 @@ const RoomPage = () => {
     />
   );
 
+  // Render Logic using State Machine
+  if (connectionStatus === "connecting") {
+    return (
+      <LoadingScreen
+        text={username ? "Joining Room..." : "Checking Access..."}
+      />
+    );
+  }
+
+  if (connectionStatus === "error") {
+    return <ErrorScreen message={errorMessage} onExit={() => navigate("/")} />;
+  }
+
+  // Only render Room UI if connected
   return (
     <MuteStateProvider localStreamRef={localStreamRef}>
       {/* Keyboard shortcuts handler */}

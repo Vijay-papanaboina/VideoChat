@@ -234,35 +234,7 @@ export const useWebRTC = (socketRef) => {
     socketRef.current.off("user-left");
 
     // Fired when the user successfully joins and receives a list of other users
-    socketRef.current.on("all-users", (otherUsers) => {
-      console.log("All other users in room:", otherUsers);
-      otherUsers.forEach((userData) => {
-        const socketId =
-          typeof userData === "string" ? userData : userData.socketId;
-        const username =
-          typeof userData === "string"
-            ? `User ${socketId.slice(-4)}`
-            : userData.username;
-
-        // Store the username for this socket ID
-        setRemoteUsernames((prev) => ({
-          ...prev,
-          [socketId]: username,
-        }));
-
-        // Only create peer connection if it doesn't already exist
-        if (!peerConnectionsRef.current[socketId]) {
-          const pc = createPeerConnection(
-            socketId,
-            true,
-            localStreamRef,
-            socketRef,
-            setRemoteStreams
-          );
-          peerConnectionsRef.current[socketId] = pc;
-        }
-      });
-    });
+    socketRef.current.on("all-users", handleAllUsers);
 
     // Fired when a new user joins the room
     socketRef.current.on("user-joined", (payload) => {
@@ -306,6 +278,40 @@ export const useWebRTC = (socketRef) => {
     handleUserLeft,
     socketRef,
   ]);
+
+  // Handle receiving list of all users
+  const handleAllUsers = useCallback(
+    (otherUsers) => {
+      console.log("All other users in room:", otherUsers);
+      otherUsers.forEach((userData) => {
+        const socketId =
+          typeof userData === "string" ? userData : userData.socketId;
+        const username =
+          typeof userData === "string"
+            ? `User ${socketId.slice(-4)}`
+            : userData.username;
+
+        // Store the username for this socket ID
+        setRemoteUsernames((prev) => ({
+          ...prev,
+          [socketId]: username,
+        }));
+
+        // Only create peer connection if it doesn't already exist
+        if (!peerConnectionsRef.current[socketId]) {
+          const pc = createPeerConnection(
+            socketId,
+            true,
+            localStreamRef,
+            socketRef,
+            setRemoteStreams
+          );
+          peerConnectionsRef.current[socketId] = pc;
+        }
+      });
+    },
+    [socketRef, localStreamRef]
+  );
 
   // Cleanup function
   const cleanup = useCallback(() => {
@@ -369,6 +375,7 @@ export const useWebRTC = (socketRef) => {
     localStreamReady,
     initializeLocalStream,
     setupSocketListeners,
+    handleAllUsers, // Exporting this for manual triggering
     cleanup,
   };
 };
