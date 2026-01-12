@@ -86,26 +86,30 @@ export const registerRoomHandlers = (socket, io) => {
       }
     } else {
       const existingRoom = rooms[roomId];
+      // Reactivate permanent rooms when users rejoin
       if (existingRoom.isPermanent && !existingRoom.isActive) {
-        socket.emit("join-error", {
-          message:
-            "This room is temporarily unavailable. It may be under maintenance or has been deactivated.",
-        });
-        console.log(
-          `🚫 Access denied to inactive permanent room ${roomId} from ${socket.id}`
-        );
-        return;
+        existingRoom.isActive = true;
+        console.log(`♻️ Permanent room ${roomId} reactivated`);
+
+        // Re-create chat session when room becomes active again
+        try {
+          await roomService.createPermanentChatSession(roomId);
+        } catch (error) {
+          console.error(`❌ Failed to recreate chat session:`, error);
+        }
       }
     }
 
     // Check room access permissions
     if (rooms[roomId].isInviteOnly) {
-      if (rooms[roomId].createdBy !== userId) {
+      // Check if user is a member of this permanent room
+      const isMember = await roomService.isPermanentRoomMember(roomId, userId);
+      if (!isMember) {
         socket.emit("join-error", {
           message: "This room is invite-only. You need an invitation to join.",
         });
         console.log(
-          `🚫 Access denied to invite-only room ${roomId} from ${socket.id}`
+          `🚫 Access denied to invite-only room ${roomId} - user ${userId} is not a member`
         );
         return;
       }
@@ -305,6 +309,14 @@ export const registerRoomHandlers = (socket, io) => {
 
     try {
       await roomService.createPermanentRoom(roomId, userId);
+
+      // Add creator as a member with admin rights
+      await roomService.addPermanentRoomMember(
+        roomId,
+        userId,
+        userId, // addedBy = self
+        true // isAdmin = true
+      );
 
       rooms[roomId] = {
         password: null,

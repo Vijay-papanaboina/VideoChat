@@ -45,7 +45,7 @@ const RoomPage = () => {
   const navigate = useNavigate();
 
   // Hook 4: useAuthState - get user authentication state
-  const { user, isAuthenticated } = useAuthState();
+  const { user, isAuthenticated, isLoading } = useAuthState();
 
   // Hook 4.5: useAuthActions - control navbar visibility
   const { hideNavbar, showNavbarAction } = useAuthActions();
@@ -71,8 +71,8 @@ const RoomPage = () => {
   // Hook 11: useState - room management modal
   const [showRoomManagement, setShowRoomManagement] = useState(false);
 
-  // Get user details from navigation state
-  const username = location.state?.username;
+  // Get user details from navigation state or authenticated user
+  const username = location.state?.username || user?.username;
   const password = location.state?.password;
   const isCreating = location.state?.isCreating || false;
 
@@ -181,6 +181,11 @@ const RoomPage = () => {
 
   // Hook 16: useEffect - main room setup effect
   useEffect(() => {
+    // Wait for auth check to complete
+    if (isLoading) {
+      console.log("Waiting for authentication check...");
+      return;
+    }
     console.log("useEffect running - checking credentials");
     // Only proceed if username is available (password is optional)
     if (!username) {
@@ -327,15 +332,17 @@ const RoomPage = () => {
     };
   }, [
     roomId,
-    username,
     password,
+    username,
     isCreating,
+    location.state,
+    user?.id,
+    isAuthenticated,
+    isLoading,
     navigate,
     initializeLocalStream,
     setupSocketListeners,
     cleanup,
-    isAuthenticated,
-    user?.id,
     localStreamRef,
     forceStopAllTracks,
     setSocketReady,

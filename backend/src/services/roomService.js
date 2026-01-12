@@ -517,17 +517,18 @@ export const updatePermanentRoomMemberAdmin = async (
     throw error;
   }
 };
-
-// Get rooms where user is a member
+// Get rooms where user is a member (with roomType and memberCount for dashboard)
 export const getUserPermanentRoomMemberships = async (userId) => {
   try {
+    // Get memberships with room details
     const memberships = await db
       .select({
         roomId: permanentRoomMembers.roomId,
         isAdmin: permanentRoomMembers.isAdmin,
         addedAt: permanentRoomMembers.addedAt,
-        roomCreatedAt: permanentRooms.createdAt,
-        roomIsActive: permanentRooms.isActive,
+        createdAt: permanentRooms.createdAt,
+        createdBy: permanentRooms.createdBy,
+        isActive: permanentRooms.isActive,
       })
       .from(permanentRoomMembers)
       .innerJoin(
@@ -536,7 +537,28 @@ export const getUserPermanentRoomMemberships = async (userId) => {
       )
       .where(eq(permanentRoomMembers.userId, userId));
 
-    return memberships;
+    // Add roomType and memberCount for each room
+    const roomsWithDetails = await Promise.all(
+      memberships.map(async (membership) => {
+        // Get member count for this room
+        const members = await db
+          .select({ count: permanentRoomMembers.userId })
+          .from(permanentRoomMembers)
+          .where(eq(permanentRoomMembers.roomId, membership.roomId));
+
+        return {
+          roomId: membership.roomId,
+          isAdmin: membership.isAdmin,
+          createdAt: membership.createdAt,
+          isActive: membership.isActive,
+          // roomType: 'created' if user is the creator, 'member' otherwise
+          roomType: membership.createdBy === userId ? "created" : "member",
+          memberCount: members.length,
+        };
+      })
+    );
+
+    return roomsWithDetails;
   } catch (error) {
     console.error(`❌ Failed to get user permanent room memberships:`, error);
     return [];
