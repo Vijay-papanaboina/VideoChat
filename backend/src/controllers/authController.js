@@ -16,14 +16,8 @@ export const register = async (req, res) => {
       bio,
     });
 
-    // Set HTTP-only cookie with token
-    res.cookie("authToken", result.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      path: "/",
-    });
+    // Registration no longer returns token - user must login
+    // Cookie is not set here anymore
 
     res.status(201).json({
       success: true,
@@ -57,10 +51,12 @@ export const login = async (req, res) => {
     const result = await authService.login(email, password);
 
     // Set HTTP-only cookie with token
+    // Use sameSite: 'none' for cross-origin requests (frontend/backend on different domains)
+    const isProduction = process.env.NODE_ENV === "production";
     res.cookie("authToken", result.token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: isProduction, // Required for sameSite: 'none'
+      sameSite: isProduction ? "none" : "lax", // 'none' for cross-origin in prod
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: "/",
     });
