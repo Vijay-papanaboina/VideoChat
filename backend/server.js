@@ -10,6 +10,7 @@ dotenv.config();
 // Import routes
 import authRoutes from "./routes/auth.js";
 import chatRoutes from "./routes/chat.js";
+import roomRoutes from "./routes/rooms.js";
 
 // Import middleware
 import { errorHandler, notFound } from "./src/middleware/errorHandler.js";
@@ -31,6 +32,9 @@ const io = initializeSocketIO(server, corsOrigin);
 
 // Initialize background jobs
 initJobs();
+
+// Trust proxy (required for rate limiting behind reverse proxies like Render, Heroku, etc.)
+app.set("trust proxy", 1);
 
 // Middleware
 app.use(express.json());
@@ -56,6 +60,7 @@ app.use("/api/auth/register", authLimiter);
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/rooms", roomRoutes);
 
 // A simple root route for health checks
 app.get("/", (req, res) => {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuthState } from "../stores/authStore";
 import { Button } from "@/components/ui/button";
@@ -25,12 +25,12 @@ import {
   Trash2,
   Mail,
 } from "lucide-react";
-import io from "socket.io-client";
 import SendInviteModal from "../components/modals/SendInviteModal";
 
 /**
  * RoomManagementPage Component
  * Dedicated page for managing room members and settings
+ * Uses HTTP for data fetching, Socket for real-time admin actions
  */
 const RoomManagementPage = () => {
   const navigate = useNavigate();
@@ -43,42 +43,42 @@ const RoomManagementPage = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const socketRef = useRef(null);
 
-  // Setup socket connection
+  const serverUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+
+  // Fetch room info via HTTP
+  const fetchRoomInfo = async () => {
+    try {
+      const response = await fetch(`${serverUrl}/api/rooms/${roomId}/members`, {
+        method: "GET",
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (data.success) {
+        // Transform data to match expected format
+        setRoomInfo({
+          roomId,
+          members: data.data,
+          admins: data.data.filter((m) => m.isAdmin).map((m) => m.userId),
+          createdBy: data.data.find((m) => m.userId === m.addedBy)?.userId,
+          createdAt: data.data[0]?.addedAt || new Date().toISOString(),
+        });
+      } else {
+        console.error("Failed to fetch room info:", data.message);
+      }
+    } catch (error) {
+      console.error("Failed to fetch room info:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load data on mount
   useEffect(() => {
     if (isAuthenticated && roomId) {
-      const serverUrl =
-        import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
-      socketRef.current = io(serverUrl);
-
-      // Request room info
-      socketRef.current.emit("get-room-info", { roomId, userId: user?.id });
-
-      // Listen for room info response
-      socketRef.current.on("room-info", (data) => {
-        setRoomInfo(data);
-        setIsLoading(false);
-      });
-
-      // Listen for room deleted
-      socketRef.current.on("room-deleted", () => {
-        navigate("/rooms");
-      });
-
-      socketRef.current.on("error", (data) => {
-        console.error("Room management error:", data.message);
-        alert(data.message);
-        setIsLoading(false);
-      });
-
-      return () => {
-        if (socketRef.current) {
-          socketRef.current.disconnect();
-        }
-      };
+      fetchRoomInfo();
     }
-  }, [isAuthenticated, roomId, user?.id, navigate]);
+  }, [isAuthenticated, roomId]);
 
   // Copy room ID to clipboard
   const copyToClipboard = async () => {
@@ -91,41 +91,48 @@ const RoomManagementPage = () => {
     }
   };
 
-  // Delete room
+  // Delete room via HTTP
   const handleDeleteRoom = async () => {
-    if (!roomInfo || !socketRef.current) return;
+    if (!roomInfo) return;
 
     setIsDeleting(true);
     try {
-      socketRef.current.emit("delete-permanent-room", {
-        roomId,
-        userId: user?.id,
+      const response = await fetch(`${serverUrl}/api/rooms/${roomId}`, {
+        method: "DELETE",
+        credentials: "include",
       });
+      const data = await response.json();
+      if (data.success) {
+        navigate("/rooms");
+      } else {
+        alert(data.message || "Failed to delete room");
+        setIsDeleting(false);
+      }
     } catch (error) {
       console.error("Failed to delete room:", error);
+      alert("Failed to delete room. Please try again.");
       setIsDeleting(false);
     }
   };
 
-  const handleKickUser = (targetSocketId) => {
-    if (socketRef.current) {
-      socketRef.current.emit("kick-user", { targetSocketId, roomId });
-      setShowUserActions(null);
-    }
+  // Note: Kick/Promote/Demote only work when users are actively in a room
+  // These actions are handled in RoomPage when users are connected via socket
+  const handleKickUser = (memberId) => {
+    alert(
+      "User management is only available when users are in an active call. Join the room to manage participants."
+    );
   };
 
-  const handlePromoteUser = (targetSocketId) => {
-    if (socketRef.current) {
-      socketRef.current.emit("promote-user", { targetSocketId, roomId });
-      setShowUserActions(null);
-    }
+  const handlePromoteUser = (memberId) => {
+    alert(
+      "User management is only available when users are in an active call. Join the room to manage participants."
+    );
   };
 
-  const handleDemoteUser = (targetSocketId) => {
-    if (socketRef.current) {
-      socketRef.current.emit("demote-user", { targetSocketId, roomId });
-      setShowUserActions(null);
-    }
+  const handleDemoteUser = (memberId) => {
+    alert(
+      "User management is only available when users are in an active call. Join the room to manage participants."
+    );
   };
 
   const handleJoinRoom = () => {

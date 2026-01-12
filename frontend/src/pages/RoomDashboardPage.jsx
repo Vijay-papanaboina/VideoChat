@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthState } from "../stores/authStore";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,6 @@ import {
   LogOut,
   Edit,
 } from "lucide-react";
-import io from "socket.io-client";
 import CreatePermanentRoomModal from "../components/modals/CreatePermanentRoomModal";
 
 /**
@@ -33,54 +32,32 @@ const RoomManagementPage = () => {
   const [userRooms, setUserRooms] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const socketRef = useRef(null);
 
-  // Setup socket connection
+  const serverUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+
+  // Fetch user's rooms via HTTP
+  const fetchUserRooms = async () => {
+    try {
+      const response = await fetch(`${serverUrl}/api/rooms/my-rooms`, {
+        method: "GET",
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (data.success) {
+        setUserRooms(data.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch rooms:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (isAuthenticated) {
-      const serverUrl =
-        import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
-      socketRef.current = io(serverUrl);
-
-      // Request user's rooms
-      socketRef.current.emit("get-user-rooms", { userId: user?.id });
-
-      // Listen for user rooms response
-      socketRef.current.on("user-rooms", (rooms) => {
-        setUserRooms(rooms);
-        setIsLoading(false);
-      });
-
-      // Listen for leave room responses
-      socketRef.current.on("room-left", (data) => {
-        console.log("Successfully left room:", data);
-        // Refresh the rooms list
-        if (socketRef.current && user?.id) {
-          socketRef.current.emit("get-user-rooms", { userId: user.id });
-        }
-      });
-
-      socketRef.current.on("error", (error) => {
-        console.error("Socket error:", error);
-        // Handle specific errors
-        if (error.code === "CREATOR_CANNOT_LEAVE") {
-          alert(
-            "Room creators cannot leave their own room. You must delete the room instead."
-          );
-        } else if (error.code === "NOT_MEMBER") {
-          alert("You are not a member of this room.");
-        } else if (error.code === "LEAVE_FAILED") {
-          alert("Failed to leave room. Please try again.");
-        }
-      });
-
-      return () => {
-        if (socketRef.current) {
-          socketRef.current.disconnect();
-        }
-      };
+      fetchUserRooms();
     }
-  }, [isAuthenticated, user?.id]);
+  }, [isAuthenticated]);
 
   const handleCreateRoom = () => {
     setShowCreateModal(true);
@@ -88,9 +65,7 @@ const RoomManagementPage = () => {
 
   const handleRoomCreated = () => {
     // Refresh the rooms list
-    if (socketRef.current && user?.id) {
-      socketRef.current.emit("get-user-rooms", { userId: user.id });
-    }
+    fetchUserRooms();
   };
 
   const handleManageRoom = (roomId) => {
@@ -102,18 +77,27 @@ const RoomManagementPage = () => {
       state: {
         username: user?.username,
         password: null,
-        isCreating: false, // This is for joining existing permanent rooms
-        from: "/rooms", // Track where they came from
+        isCreating: false,
+        from: "/rooms",
       },
     });
   };
 
-  const handleLeaveRoom = (roomId) => {
-    if (socketRef.current && user?.id) {
-      socketRef.current.emit("leave-room", {
-        roomId,
-        userId: user.id,
+  const handleLeaveRoom = async (roomId) => {
+    try {
+      const response = await fetch(`${serverUrl}/api/rooms/${roomId}/leave`, {
+        method: "DELETE",
+        credentials: "include",
       });
+      const data = await response.json();
+      if (data.success) {
+        fetchUserRooms(); // Refresh list
+      } else {
+        alert(data.message || "Failed to leave room");
+      }
+    } catch (error) {
+      console.error("Failed to leave room:", error);
+      alert("Failed to leave room. Please try again.");
     }
   };
 
