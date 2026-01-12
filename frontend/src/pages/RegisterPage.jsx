@@ -22,6 +22,7 @@ const RegisterPage = () => {
     password: "",
     confirmPassword: "",
   });
+  const [successMessage, setSuccessMessage] = useState("");
   const { register } = useAuthActions();
   const { isLoading, error } = useAuthState();
   const navigate = useNavigate();
@@ -36,6 +37,7 @@ const RegisterPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSuccessMessage("");
 
     // Basic validation - let backend handle detailed validation
     const passwordErrors = validatePasswordMatch(
@@ -51,7 +53,10 @@ const RegisterPage = () => {
     const result = await register(userData);
 
     if (result.success) {
-      navigate("/rooms");
+      setSuccessMessage(
+        result.message ||
+          "Registration successful! Please verify your email to log in."
+      );
     }
   };
 
@@ -85,6 +90,18 @@ const RegisterPage = () => {
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
                   {error}
+                </div>
+              )}
+
+              {successMessage && (
+                <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md text-sm">
+                  <p className="font-medium">{successMessage}</p>
+                  <Link
+                    to="/login"
+                    className="mt-2 inline-block text-green-600 hover:text-green-500 font-medium underline"
+                  >
+                    Go to Login →
+                  </Link>
                 </div>
               )}
 

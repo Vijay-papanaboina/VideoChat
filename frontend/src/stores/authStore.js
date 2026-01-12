@@ -139,7 +139,7 @@ export const useAuthStore = create((set) => ({
           headers: {
             "Content-Type": "application/json",
           },
-          credentials: "include", // Include cookies
+          credentials: "include",
           body: JSON.stringify(userData),
         }
       );
@@ -151,20 +151,17 @@ export const useAuthStore = create((set) => ({
 
       const data = await response.json();
 
+      // Registration successful - don't log in, just return success
       set({
-        user: data.data.user,
-        isAuthenticated: true,
         isLoading: false,
         error: null,
       });
 
-      return { success: true, user: data.data.user };
+      return { success: true, message: data.message };
     } catch (error) {
       set({
         error: error.message,
         isLoading: false,
-        isAuthenticated: false,
-        user: null,
       });
       return { success: false, error: error.message };
     }

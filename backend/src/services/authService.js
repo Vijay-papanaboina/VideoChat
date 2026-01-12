@@ -10,7 +10,7 @@ import {
   generateExpiry,
   sendVerificationEmail,
   sendPasswordResetEmail,
-} from "./emailService.js";
+} from "./emailServiceEthereal.js";
 
 const JWT_SECRET =
   process.env.JWT_SECRET || "your-super-secret-jwt-key-change-in-production";
@@ -184,6 +184,9 @@ export const register = async (userData) => {
   const verificationToken = generateEmailToken();
   const verificationTokenExpiry = generateExpiry(24); // 24 hours
 
+  // In development mode, auto-verify users
+  const isDevelopment = process.env.NODE_ENV !== "production";
+
   // Create user data
   const newUserData = {
     username,
@@ -198,10 +201,10 @@ export const register = async (userData) => {
     totalCalls: 0,
     totalDuration: 0,
     lastActive: new Date(),
-    isVerified: false,
+    isVerified: isDevelopment, // Auto-verify in development
     isActive: true,
-    verificationToken,
-    verificationTokenExpiry,
+    verificationToken: isDevelopment ? null : verificationToken,
+    verificationTokenExpiry: isDevelopment ? null : verificationTokenExpiry,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -209,22 +212,21 @@ export const register = async (userData) => {
   // Create user
   const user = await createUser(newUserData);
 
-  // Send verification email (async, don't block registration)
-  sendVerificationEmail(email, username, verificationToken).catch((err) => {
-    console.error("Failed to send verification email:", err);
-  });
+  // Send verification email only in production
+  if (!isDevelopment) {
+    sendVerificationEmail(email, username, verificationToken).catch((err) => {
+      console.error("Failed to send verification email:", err);
+    });
+  } else {
+    console.log(`[Dev Mode] User ${username} auto-verified, skipping email.`);
+  }
 
-  // Generate token for session
-  const token = generateToken(user.id);
-
-  // Store session
-  await storeUserSession(user.id, token);
-
+  // Registration complete - user must log in separately
   return {
     user: sanitizeUser(user),
-    token,
-    message:
-      "Registration successful! Please check your email to verify your account.",
+    message: isDevelopment
+      ? "Registration successful! You can now log in."
+      : "Registration successful! Please check your email to verify your account, then log in.",
   };
 };
 
