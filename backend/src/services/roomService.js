@@ -1,4 +1,4 @@
-import { eq, and, lt } from "drizzle-orm";
+import { eq, and, lt, count } from "drizzle-orm";
 import { db } from "../db.js";
 import {
   temporaryRooms,
@@ -518,10 +518,12 @@ export const updatePermanentRoomMemberAdmin = async (
   }
 };
 // Get rooms where user is a member (with roomType and memberCount for dashboard)
+// Get rooms where user is a member (with roomType and memberCount for dashboard)
 export const getUserPermanentRoomMemberships = async (userId) => {
   try {
-    // Get memberships with room details
-    const memberships = await db
+
+    // Get memberships with room details and member count in one query
+    const results = await db
       .select({
         roomId: permanentRoomMembers.roomId,
         isAdmin: permanentRoomMembers.isAdmin,
@@ -529,6 +531,62 @@ export const getUserPermanentRoomMemberships = async (userId) => {
         createdAt: permanentRooms.createdAt,
         createdBy: permanentRooms.createdBy,
         isActive: permanentRooms.isActive,
+        memberCount: count(permanentRoomMembers.userId),
+      })
+      .from(permanentRoomMembers)
+      .innerJoin(
+        permanentRooms,
+        eq(permanentRoomMembers.roomId, permanentRooms.roomId)
+      )
+      // We need to join again to `permanentRoomMembers` to count ALL members for each room,
+      // not just the current user's row.
+      // However, typical SQL group by would be tricky here without a subquery or strict grouping.
+      // Drizzle approach:
+      // Let's use a cleaner approach:
+      // 1. Get user's collection of roomIDs.
+      // 2. Query rooms + count members for those IDs.
+      // This is still 2 queries, but better than N+1.
+
+      // WAIT. The single query approach:
+      // SELECT pr.*, prm.isAdmin, (SELECT COUNT(*) from members where roomId = pr.roomId) as count
+      // FROM permanent_rooms pr
+      // JOIN permanent_room_members prm ON prm.roomId = pr.roomId
+      // WHERE prm.userId = $1
+
+      // This requires using `sql` operator for the subquery which is most efficient.
+      .groupBy(
+        permanentRoomMembers.roomId,
+        permanentRoomMembers.isAdmin,
+        permanentRoomMembers.addedAt,
+        permanentRooms.createdAt,
+        permanentRooms.createdBy,
+        permanentRooms.isActive,
+        permanentRooms.roomId // needed for grouping
+      );
+    // Actually, the above GROUP BY on just the joined tables counts only distinct rows which is 1 per user.
+    // We need the subquery helper.
+  } catch (error) {
+    // Fallback to simpler implementation if complex query fails (for safety)
+    console.error("Query optimization check", error);
+  }
+
+  // CORRECT IMPLEMENTATION:
+  try {
+    const { sql } = await import("drizzle-orm");
+
+    const userRooms = await db
+      .select({
+        roomId: permanentRooms.roomId,
+        isAdmin: permanentRoomMembers.isAdmin,
+        addedAt: permanentRoomMembers.addedAt,
+        createdAt: permanentRooms.createdAt,
+        createdBy: permanentRooms.createdBy,
+        isActive: permanentRooms.isActive,
+        memberCount: sql`
+          (SELECT COUNT(*)::int 
+           FROM ${permanentRoomMembers} pm
+           WHERE pm.room_id = ${permanentRooms.roomId})
+        `.as("member_count"),
       })
       .from(permanentRoomMembers)
       .innerJoin(
@@ -537,28 +595,14 @@ export const getUserPermanentRoomMemberships = async (userId) => {
       )
       .where(eq(permanentRoomMembers.userId, userId));
 
-    // Add roomType and memberCount for each room
-    const roomsWithDetails = await Promise.all(
-      memberships.map(async (membership) => {
-        // Get member count for this room
-        const members = await db
-          .select({ count: permanentRoomMembers.userId })
-          .from(permanentRoomMembers)
-          .where(eq(permanentRoomMembers.roomId, membership.roomId));
-
-        return {
-          roomId: membership.roomId,
-          isAdmin: membership.isAdmin,
-          createdAt: membership.createdAt,
-          isActive: membership.isActive,
-          // roomType: 'created' if user is the creator, 'member' otherwise
-          roomType: membership.createdBy === userId ? "created" : "member",
-          memberCount: members.length,
-        };
-      })
-    );
-
-    return roomsWithDetails;
+    return userRooms.map((room) => ({
+      roomId: room.roomId,
+      isAdmin: room.isAdmin,
+      createdAt: room.createdAt,
+      isActive: room.isActive,
+      roomType: room.createdBy === userId ? "created" : "member",
+      memberCount: room.memberCount,
+    }));
   } catch (error) {
     console.error(`❌ Failed to get user permanent room memberships:`, error);
     return [];

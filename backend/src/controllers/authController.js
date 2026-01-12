@@ -21,7 +21,7 @@ export const register = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: "User registered successfully",
+      message: "Registration successful! Please verify your email to log in.",
       data: {
         user: result.user,
         // Don't send token in response body for security
@@ -82,20 +82,25 @@ export const login = async (req, res) => {
 export const logout = async (req, res) => {
   try {
     const authHeader = req.headers["authorization"];
-    const token = authHeader && authHeader.split(" ")[1];
+    const token =
+      (authHeader && authHeader.split(" ")[1]) || req.cookies.authToken;
 
-    if (!token) {
-      return res.status(400).json({
-        success: false,
-        message: "Token is required",
-      });
+    if (token) {
+      try {
+        await authService.logout(token);
+      } catch (error) {
+        console.error("Error invalidating session:", error);
+        // Continue to clear cookie even if session invalidation fails
+      }
     }
 
     // Clear the HTTP-only cookie
+    // Clear the HTTP-only cookie
+    const isProduction = process.env.NODE_ENV === "production";
     res.clearCookie("authToken", {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
       path: "/",
     });
 

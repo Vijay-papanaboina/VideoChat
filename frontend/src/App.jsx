@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
+import { Toaster } from "sonner";
 import { ThemeProvider } from "./components/ui/theme-provider";
 import LoadingScreen from "./components/ui/LoadingScreen";
 import Navbar from "./components/layout/Navbar";
@@ -90,6 +91,9 @@ function App() {
 
           {/* Global invite notifications */}
           <InviteNotifications />
+
+          {/* Toast Notifications */}
+          <Toaster richColors position="top-center" />
         </div>
       </div>
     </ThemeProvider>

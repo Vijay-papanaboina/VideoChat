@@ -5,6 +5,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
+import helmet from "helmet";
 dotenv.config();
 
 // Import routes
@@ -25,6 +26,9 @@ import { initJobs } from "./jobs/roomCleanup.js";
 // Initialize Express app and HTTP server
 const app = express();
 const server = http.createServer(app);
+
+// Security Middleware
+app.use(helmet());
 
 // Configure Socket.IO
 const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:4000";

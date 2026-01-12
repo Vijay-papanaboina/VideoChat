@@ -3,4 +3,4 @@ logs/
 *.log
 .env*
 .DS_Store
-docs/analysis
+local/analysis

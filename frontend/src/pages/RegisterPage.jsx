@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { useAuthActions, useAuthState } from "../stores/authStore";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -53,10 +54,14 @@ const RegisterPage = () => {
     const result = await register(userData);
 
     if (result.success) {
-      setSuccessMessage(
+      const message =
         result.message ||
-          "Registration successful! Please verify your email to log in."
-      );
+        "Registration successful! Please verify your email to log in.";
+      setSuccessMessage(message);
+      toast.success("Account Created", {
+        description: message,
+        duration: 6000,
+      });
     }
   };
 

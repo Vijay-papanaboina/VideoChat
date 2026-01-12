@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { useAuthActions, useAuthState } from "../stores/authStore";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -32,6 +33,10 @@ const LoginPage = () => {
 
     if (result.success) {
       navigate("/rooms");
+    } else {
+      toast.error("Login Failed", {
+        description: result.error || "Please check your credentials",
+      });
     }
   };
 
@@ -62,11 +67,7 @@ const LoginPage = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
-                  {error}
-                </div>
-              )}
+              {/* Error removed in favor of toast */}
 
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
