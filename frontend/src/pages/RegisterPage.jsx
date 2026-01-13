@@ -25,7 +25,7 @@ const RegisterPage = () => {
   });
   const [successMessage, setSuccessMessage] = useState("");
   const { register } = useAuthActions();
-  const { isLoading, error } = useAuthState();
+  const { isSubmitting, error } = useAuthState();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -121,7 +121,7 @@ const RegisterPage = () => {
                     onChange={handleChange}
                     placeholder="First name"
                     required
-                    disabled={isLoading}
+                    disabled={isSubmitting}
                   />
                 </div>
                 <div className="space-y-2">
@@ -134,7 +134,7 @@ const RegisterPage = () => {
                     onChange={handleChange}
                     placeholder="Last name"
                     required
-                    disabled={isLoading}
+                    disabled={isSubmitting}
                   />
                 </div>
               </div>
@@ -149,7 +149,7 @@ const RegisterPage = () => {
                   onChange={handleChange}
                   placeholder="Choose a username"
                   required
-                  disabled={isLoading}
+                  disabled={isSubmitting}
                 />
               </div>
 
@@ -163,7 +163,7 @@ const RegisterPage = () => {
                   onChange={handleChange}
                   placeholder="Enter your email"
                   required
-                  disabled={isLoading}
+                  disabled={isSubmitting}
                 />
               </div>
 
@@ -177,7 +177,7 @@ const RegisterPage = () => {
                   onChange={handleChange}
                   placeholder="Create a password"
                   required
-                  disabled={isLoading}
+                  disabled={isSubmitting}
                 />
               </div>
 
@@ -191,12 +191,12 @@ const RegisterPage = () => {
                   onChange={handleChange}
                   placeholder="Confirm your password"
                   required
-                  disabled={isLoading}
+                  disabled={isSubmitting}
                 />
               </div>
 
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Creating account..." : "Create account"}
+                {isSubmitting ? "Creating account..." : "Create account"}
               </Button>
             </form>
 

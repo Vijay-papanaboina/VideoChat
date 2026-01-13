@@ -16,7 +16,7 @@ import {
 const LoginPage = () => {
   const [formData, setFormData] = useState({ email: "", password: "" });
   const { login } = useAuthActions();
-  const { isLoading, error } = useAuthState();
+  const { isSubmitting, error } = useAuthState();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -79,7 +79,7 @@ const LoginPage = () => {
                   onChange={handleChange}
                   placeholder="Enter your email"
                   required
-                  disabled={isLoading}
+                  disabled={isSubmitting}
                 />
               </div>
 
@@ -93,7 +93,7 @@ const LoginPage = () => {
                   onChange={handleChange}
                   placeholder="Enter your password"
                   required
-                  disabled={isLoading}
+                  disabled={isSubmitting}
                 />
                 <div className="text-right">
                   <Link
@@ -105,8 +105,8 @@ const LoginPage = () => {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Signing in..." : "Sign in"}
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? "Signing in..." : "Sign in"}
               </Button>
             </form>
 

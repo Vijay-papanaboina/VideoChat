@@ -9,6 +9,7 @@ export const useAuthStore = create((set) => ({
   user: null,
   isAuthenticated: false,
   isLoading: true, // Start with loading true for initial auth check
+  isSubmitting: false, // For form submissions (login, register, etc.)
   error: null,
   showNavbar: true, // Navbar visibility
 
@@ -83,7 +84,7 @@ export const useAuthStore = create((set) => ({
   },
 
   login: async (credentials) => {
-    set({ isLoading: true, error: null });
+    set({ isSubmitting: true, error: null });
 
     try {
       const response = await fetch(
@@ -110,7 +111,7 @@ export const useAuthStore = create((set) => ({
       set({
         user: data.data.user,
         isAuthenticated: true,
-        isLoading: false,
+        isSubmitting: false,
         error: null,
       });
 
@@ -118,7 +119,7 @@ export const useAuthStore = create((set) => ({
     } catch (error) {
       set({
         error: error.message,
-        isLoading: false,
+        isSubmitting: false,
         isAuthenticated: false,
         user: null,
       });
@@ -127,7 +128,7 @@ export const useAuthStore = create((set) => ({
   },
 
   register: async (userData) => {
-    set({ isLoading: true, error: null });
+    set({ isSubmitting: true, error: null });
 
     try {
       const response = await fetch(
@@ -153,7 +154,7 @@ export const useAuthStore = create((set) => ({
 
       // Registration successful - don't log in, just return success
       set({
-        isLoading: false,
+        isSubmitting: false,
         error: null,
       });
 
@@ -161,7 +162,7 @@ export const useAuthStore = create((set) => ({
     } catch (error) {
       set({
         error: error.message,
-        isLoading: false,
+        isSubmitting: false,
       });
       return { success: false, error: error.message };
     }
@@ -355,6 +356,7 @@ export const useAuthState = () => {
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isLoading = useAuthStore((state) => state.isLoading);
+  const isSubmitting = useAuthStore((state) => state.isSubmitting);
   const error = useAuthStore((state) => state.error);
   const showNavbar = useAuthStore((state) => state.showNavbar);
 
@@ -362,6 +364,7 @@ export const useAuthState = () => {
     user,
     isAuthenticated,
     isLoading,
+    isSubmitting,
     error,
     showNavbar,
   };
