@@ -21,7 +21,8 @@ export const register = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: "Registration successful! Please verify your email to log in.",
+      // message: "Registration successful! Please verify your email to log in.",
+      message: "Registration successful! you can log in now.",
       data: {
         user: result.user,
         // Don't send token in response body for security

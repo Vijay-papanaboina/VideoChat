@@ -31,7 +31,7 @@ function App() {
   }, [checkAuth]);
 
   return (
-    <ThemeProvider defaultTheme="light" storageKey="video-call-theme">
+    <ThemeProvider defaultTheme="dark" storageKey="video-call-theme">
       <div className="App">
         {showNavbar && <Navbar />}
         <div className="relative">
