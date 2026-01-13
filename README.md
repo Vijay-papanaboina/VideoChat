@@ -1,100 +1,78 @@
-# VideoCallApp Monorepo
+# VideoCallApp
 
-Real-time video calling application with WebRTC, Socket.IO, React (Vite) frontend, and Node/Express backend. This monorepo contains two workspaces:
+Real-time video calling application with WebRTC mesh topology, Socket.IO signaling, and full room management.
 
-- `backend/` — Express + Socket.IO signaling server, REST endpoints, Drizzle ORM (PostgreSQL)
-- `frontend/` — React + Vite client, Tailwind, shadcn/ui, WebRTC and Socket.IO client
+🔗 **Live Demo:** https://video-chat-beta.vercel.app
+
+## Features
+
+- **P2P Video Calls** — Mesh topology where peers connect directly
+- **Screen Sharing** — Track replacement without SDP renegotiation
+- **Video Recording & Screenshots** — MediaRecorder with codec detection
+- **Temporary Rooms** — No login, auto-delete when empty
+- **Permanent Rooms** — PostgreSQL-backed with invite system
+- **Admin Controls** — Kick, promote, demote members
+- **Real-time Chat** — With typing indicators
 
 ## Architecture
 
-- WebRTC for peer-to-peer media
-- Socket.IO for signaling and realtime features (chat, presence, room admin)
-- REST endpoints for auth/chat helpers and room checks
-- PostgreSQL persistence via Drizzle ORM for permanent rooms, messages, and invitations
-
-### Directory Structure
-
 ```
-VideoCallApp/
-├── backend/
-│   ├── server.js           # Express + Socket.IO server
-│   ├── drizzle/            # Generated migrations (drizzle)
-│   ├── drizzle.config.js   # Drizzle CLI config
-│   ├── routes/             # REST routes (auth, chat, etc.)
-│   └── src/                # db, schema, services, middleware
-└── frontend/
-    ├── src/                # React app (components, pages, lib)
-    ├── vite.config.js      # Vite config (dev server port)
-    └── public/             # Static assets
+Frontend (React)  ←──REST/Socket──→  Backend (Express)  ←───→  PostgreSQL
+     │                                      │
+     │ WebRTC (P2P Media)                   │ Signaling Only
+     └──────────────────────────────────────┘
 ```
 
-## Environment Variables (Summary)
+**Key:** Media flows directly between browsers. Server only handles signaling.
 
-- Backend
-  - `PORT` (default 8000)
-  - `NODE_ENV` (development|production)
-  - `CORS_ORIGIN` (e.g., http://localhost:4000)
-  - Database via either `DATABASE_URL` or discrete `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` (see `backend/drizzle.config.js`)
-  - (If auth uses JWT) `JWT_SECRET`
-- Frontend
-  - `VITE_BACKEND_URL` (e.g., http://localhost:8000)
+## Quick Start
 
-See the READMEs in `backend/` and `frontend/` for complete details.
+```bash
+# Backend
+cd backend && npm install && npm run dev
 
-## Local Development
+# Frontend
+cd frontend && npm install && npm run dev
+```
 
-1. Backend
+## Documentation
 
-- From `backend/`: `npm install` then `npm run dev` (or `npm start`)
-- Default: http://localhost:8000
+| Topic                           | Link                                       |
+| ------------------------------- | ------------------------------------------ |
+| **Backend API & Socket Events** | [backend/README.md](./backend/README.md)   |
+| **Frontend Setup & Usage**      | [frontend/README.md](./frontend/README.md) |
 
-2. Frontend
+## Tech Stack
 
-- From `frontend/`: `npm install` then `npm run dev`
-- Default: http://localhost:5173 (Vite dev), Vite config exposes port 4000 for dev server as configured
+| Layer    | Technologies                                 |
+| -------- | -------------------------------------------- |
+| Frontend | React, Vite, TailwindCSS, shadcn/ui, Zustand |
+| Backend  | Node.js, Express, Socket.IO, Helmet          |
+| Database | PostgreSQL, Drizzle ORM                      |
+| Auth     | JWT (httpOnly cookies), bcrypt               |
 
-3. Configure env
+## Environment Variables
 
-- `frontend/.env` → `VITE_BACKEND_URL=http://localhost:8000`
-- `backend/.env` → set DB and `CORS_ORIGIN` etc. (see backend README)
+**Backend** — See [backend/README.md](./backend/README.md#environment-variables)
 
-## Database & Migrations
+```env
+PORT=8000
+DATABASE_URL=postgresql://...
+JWT_SECRET=your-secret
+CORS_ORIGIN=http://localhost:4000
+```
 
-- ORM: Drizzle (PostgreSQL)
-- Config: `backend/drizzle.config.js`
-- Generated SQL output: `backend/drizzle/`
+**Frontend** — See [frontend/README.md](./frontend/README.md#environment-variables)
 
-Common commands (run in `backend/`):
+```env
+VITE_BACKEND_URL=http://localhost:8000
+```
 
-- Generate: `npx drizzle-kit generate`
-- Push: `npx drizzle-kit push`
+## Deployment
 
-## Key Endpoints & Events (Overview)
-
-- REST
-  - `GET /` — health/info
-  - `POST /api/rooms/check` — check room status
-  - `GET/POST /api/auth/*`, `GET/POST /api/chat/*` — see backend README
-- Socket.IO
-  - `join-room`, `offer`, `answer`, `ice-candidate`
-  - `screen-share-started`, `screen-share-stopped`
-  - `chat-message`, `typing`, `stop-typing`
-  - Admin: `kick-user`, `promote-user`, `demote-user`
-  - Invitations: `send-room-invitation`, `accept-room-invitation`, `decline-room-invitation`, `cancel-room-invitation`
-  - Membership: `get-user-rooms`, `get-room-info`, `add-room-member`, `remove-room-member`, `update-member-admin`, `leave-room`, `delete-permanent-room`
-
-## Deployment Notes
-
-- Serve frontend over HTTPS in production (WebRTC requirement)
-- Set `CORS_ORIGIN` to the deployed frontend origin
-- Provide a managed PostgreSQL and set `DATABASE_URL`
-
-## Troubleshooting
-
-- Camera/Mic denied: allow permissions in browser
-- WebRTC over HTTP: use HTTPS in production
-- CORS: ensure backend `CORS_ORIGIN` matches frontend origin
-- Socket connection: verify backend URL and ports
+- HTTPS required for WebRTC
+- Set `CORS_ORIGIN` to frontend domain
+- Use managed PostgreSQL (Supabase, Neon, Railway)
 
 ## License
 

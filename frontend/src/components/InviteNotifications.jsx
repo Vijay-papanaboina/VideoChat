@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useAuthState } from "../stores/authStore";
+import { useSocket } from "../contexts/SocketContext";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import {
@@ -10,65 +11,75 @@ import {
   CardTitle,
 } from "./ui/card";
 import { X, Mail, Check, XCircle, Clock, Users } from "lucide-react";
-import io from "socket.io-client";
 
 const InviteNotifications = () => {
   const { user, isAuthenticated } = useAuthState();
+  const { socket, socketReady } = useSocket();
   const [invitations, setInvitations] = useState([]);
   const [isResponding, setIsResponding] = useState(null);
-  const socketRef = useRef(null);
 
-  // Setup socket connection and fetch invitations
+  // Setup socket listeners and fetch invitations
   useEffect(() => {
-    if (isAuthenticated && user?.id) {
-      const serverUrl =
-        import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
-      socketRef.current = io(serverUrl);
-
-      // Request pending invitations
-      socketRef.current.emit("get-user-invitations", { userId: user.id });
-
-      // Listen for invitations response
-      socketRef.current.on("user-invitations", (invites) => {
-        setInvitations(invites);
-      });
-
-      // Listen for new invitations
-      socketRef.current.on("room-invitation-received", (data) => {
-        setInvitations((prev) => [data.invitation, ...prev]);
-      });
-
-      // Listen for invitation responses
-      socketRef.current.on("room-invitation-accepted", (data) => {
-        setInvitations((prev) =>
-          prev.filter((inv) => inv.id !== data.invitation.id)
-        );
-      });
-
-      socketRef.current.on("room-invitation-declined", (data) => {
-        setInvitations((prev) =>
-          prev.filter((inv) => inv.id !== data.invitation.id)
-        );
-      });
-
-      socketRef.current.on("room-invitation-cancelled", (data) => {
-        setInvitations((prev) =>
-          prev.filter((inv) => inv.id !== data.invitation.id)
-        );
-      });
-
-      return () => {
-        if (socketRef.current) {
-          socketRef.current.disconnect();
-        }
-      };
+    if (!isAuthenticated || !user?.id || !socket || !socketReady) {
+      return;
     }
-  }, [isAuthenticated, user?.id]);
+
+    console.log(
+      "📨 InviteNotifications: Setting up listeners on shared socket"
+    );
+
+    // Request pending invitations
+    socket.emit("get-user-invitations", { userId: user.id });
+
+    // Listen for invitations response
+    const handleUserInvitations = (invites) => {
+      setInvitations(invites);
+    };
+
+    // Listen for new invitations
+    const handleInvitationReceived = (data) => {
+      console.log("🔔 New invitation received:", data);
+      setInvitations((prev) => [data.invitation, ...prev]);
+    };
+
+    // Listen for invitation responses
+    const handleInvitationAccepted = (data) => {
+      setInvitations((prev) =>
+        prev.filter((inv) => inv.id !== data.invitation.id)
+      );
+    };
+
+    const handleInvitationDeclined = (data) => {
+      setInvitations((prev) =>
+        prev.filter((inv) => inv.id !== data.invitation.id)
+      );
+    };
+
+    const handleInvitationCancelled = (data) => {
+      setInvitations((prev) =>
+        prev.filter((inv) => inv.id !== data.invitation.id)
+      );
+    };
+
+    socket.on("user-invitations", handleUserInvitations);
+    socket.on("room-invitation-received", handleInvitationReceived);
+    socket.on("room-invitation-accepted", handleInvitationAccepted);
+    socket.on("room-invitation-declined", handleInvitationDeclined);
+    socket.on("room-invitation-cancelled", handleInvitationCancelled);
+
+    return () => {
+      socket.off("user-invitations", handleUserInvitations);
+      socket.off("room-invitation-received", handleInvitationReceived);
+      socket.off("room-invitation-accepted", handleInvitationAccepted);
+      socket.off("room-invitation-declined", handleInvitationDeclined);
+      socket.off("room-invitation-cancelled", handleInvitationCancelled);
+    };
+  }, [isAuthenticated, user?.id, socket, socketReady]);
 
   const handleAcceptInvitation = async (invitationId) => {
     setIsResponding(invitationId);
     try {
-      socketRef.current.emit("accept-room-invitation", {
+      socket.emit("accept-room-invitation", {
         invitationId,
         userId: user.id,
       });
@@ -81,7 +92,7 @@ const InviteNotifications = () => {
   const handleDeclineInvitation = async (invitationId) => {
     setIsResponding(invitationId);
     try {
-      socketRef.current.emit("decline-room-invitation", {
+      socket.emit("decline-room-invitation", {
         invitationId,
         userId: user.id,
       });

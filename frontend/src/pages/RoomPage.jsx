@@ -127,7 +127,7 @@ const RoomPage = () => {
   }, [localStreamRef]);
 
   // Hook 12: useChatActions - chat action functions
-  const { toggleChat } = useChatActions();
+  const { toggleChat, clearMessages, addMessage } = useChatActions();
 
   // Hook 13: useChatStore - chat state (only isChatOpen)
   const isChatOpen = useChatStore((state) => state.isChatOpen);
@@ -235,6 +235,28 @@ const RoomPage = () => {
     // Wait for socket to connect before setting ready
     socketRef.current.on("connect", () => {
       setSocketReady(true);
+    });
+
+    // Listen for chat messages at RoomPage level (persists when Chat panel is closed)
+    socketRef.current.on("chat-message", (data) => {
+      // Only add messages from other users (own messages are added immediately when sent)
+      if (data.username !== username) {
+        console.log(
+          "📨 RoomPage received chat message:",
+          data.username,
+          ":",
+          data.message
+        );
+        const newMessage = {
+          id: data.id || Date.now().toString(),
+          username: data.username,
+          message: data.message,
+          timestamp: data.timestamp || new Date().toISOString(),
+          type: data.type || "text",
+          roomId: data.roomId,
+        };
+        addMessage(newMessage);
+      }
     });
 
     // Handle Connection State Updates
@@ -478,6 +500,10 @@ const RoomPage = () => {
     // Cleanup WebRTC connections
     cleanup();
 
+    // Clear chat messages before leaving
+    clearMessages();
+    console.log("Chat messages cleared");
+
     // Disconnect the socket
     if (socketRef.current) {
       console.log("Disconnecting socket");
@@ -502,14 +528,18 @@ const RoomPage = () => {
     }
   };
 
-  // Dynamic Layout Calculation
-  const remoteStreamsArray = Object.entries(remoteStreams)
-    .filter(([, stream]) => stream && stream.active) // Only include active streams
-    .map(([socketId, stream]) => ({
-      socketId,
-      stream,
-      username: remoteUsernames[socketId] || `User ${socketId.slice(-4)}`,
-    }));
+  // Dynamic Layout Calculation - memoized to prevent recreation on every render
+  const remoteStreamsArray = useMemo(
+    () =>
+      Object.entries(remoteStreams)
+        .filter(([, stream]) => stream && stream.active) // Only include active streams
+        .map(([socketId, stream]) => ({
+          socketId,
+          stream,
+          username: remoteUsernames[socketId] || `User ${socketId.slice(-4)}`,
+        })),
+    [remoteStreams, remoteUsernames]
+  );
 
   const userCount = remoteStreamsArray.length + (localStreamReady ? 1 : 0);
 
@@ -606,7 +636,11 @@ const RoomPage = () => {
             playsInline
             muted
             ref={(video) => {
-              if (video && localStreamRef.current) {
+              if (
+                video &&
+                localStreamRef.current &&
+                video.srcObject !== localStreamRef.current
+              ) {
                 video.srcObject = localStreamRef.current;
               }
             }}

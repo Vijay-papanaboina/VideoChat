@@ -1,8 +1,10 @@
+import { memo } from "react";
 import { Monitor, Maximize2, Minimize2 } from "lucide-react";
 
 /**
  * VideoGrid Component
  * Renders the video grid layout with local and remote streams
+ * Wrapped with memo to prevent re-renders from chat state updates
  */
 
 const VideoGrid = ({
@@ -37,7 +39,11 @@ const VideoGrid = ({
               playsInline
               muted
               ref={(video) => {
-                if (video && localStreamRef.current) {
+                if (
+                  video &&
+                  localStreamRef.current &&
+                  video.srcObject !== localStreamRef.current
+                ) {
                   video.srcObject = localStreamRef.current;
                 }
               }}
@@ -64,7 +70,11 @@ const VideoGrid = ({
               autoPlay
               playsInline
               ref={(video) => {
-                if (video && fullscreenStreamData?.stream) {
+                if (
+                  video &&
+                  fullscreenStreamData?.stream &&
+                  video.srcObject !== fullscreenStreamData.stream
+                ) {
                   video.srcObject = fullscreenStreamData.stream;
                 }
               }}
@@ -115,7 +125,11 @@ const VideoGrid = ({
             playsInline
             muted
             ref={(video) => {
-              if (video && localStreamRef.current) {
+              if (
+                video &&
+                localStreamRef.current &&
+                video.srcObject !== localStreamRef.current
+              ) {
                 video.srcObject = localStreamRef.current;
               }
             }}
@@ -199,7 +213,11 @@ const VideoGrid = ({
                         playsInline
                         muted
                         ref={(video) => {
-                          if (video && localStreamRef.current) {
+                          if (
+                            video &&
+                            localStreamRef.current &&
+                            video.srcObject !== localStreamRef.current
+                          ) {
                             video.srcObject = localStreamRef.current;
                           }
                         }}
@@ -221,7 +239,11 @@ const VideoGrid = ({
                         autoPlay
                         playsInline
                         ref={(video) => {
-                          if (video && focusedStreamData?.stream) {
+                          if (
+                            video &&
+                            focusedStreamData?.stream &&
+                            video.srcObject !== focusedStreamData.stream
+                          ) {
                             video.srcObject = focusedStreamData.stream;
                           }
                         }}
@@ -299,13 +321,15 @@ const VideoGrid = ({
                               muted={type === "local"}
                               ref={(video) => {
                                 if (video) {
+                                  const targetStream =
+                                    type === "local"
+                                      ? localStreamRef.current
+                                      : stream;
                                   if (
-                                    type === "local" &&
-                                    localStreamRef.current
+                                    targetStream &&
+                                    video.srcObject !== targetStream
                                   ) {
-                                    video.srcObject = localStreamRef.current;
-                                  } else if (type !== "local" && stream) {
-                                    video.srcObject = stream;
+                                    video.srcObject = targetStream;
                                   }
                                 }
                               }}
@@ -385,13 +409,15 @@ const VideoGrid = ({
                               muted={type === "local"}
                               ref={(video) => {
                                 if (video) {
+                                  const targetStream =
+                                    type === "local"
+                                      ? localStreamRef.current
+                                      : stream;
                                   if (
-                                    type === "local" &&
-                                    localStreamRef.current
+                                    targetStream &&
+                                    video.srcObject !== targetStream
                                   ) {
-                                    video.srcObject = localStreamRef.current;
-                                  } else if (type !== "local" && stream) {
-                                    video.srcObject = stream;
+                                    video.srcObject = targetStream;
                                   }
                                 }
                               }}
@@ -537,4 +563,6 @@ const VideoGrid = ({
   );
 };
 
-export default VideoGrid;
+VideoGrid.displayName = "VideoGrid";
+
+export default memo(VideoGrid);

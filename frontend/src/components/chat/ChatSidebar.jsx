@@ -7,6 +7,7 @@ import Chat from "./Chat";
  */
 const ChatSidebar = memo(
   ({ socketRef, username, roomId, userId, isOpen, userCount }) => {
+    // Return null when closed - socket listeners will be in RoomPage
     if (!isOpen) return null;
 
     return (

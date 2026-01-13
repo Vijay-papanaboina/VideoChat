@@ -1,112 +1,158 @@
 # VideoCallApp Backend
 
-Express + Socket.IO server providing signaling, REST endpoints, and persistence via Drizzle ORM (PostgreSQL) for the VideoCallApp.
+Express + Socket.IO signaling server with REST API and PostgreSQL persistence.
 
 ## Features
 
-- REST endpoints for auth/chat helpers and room checks
-- Socket.IO signaling: join, offer/answer, ICE, chat, typing
-- Room admin actions (kick/promote/demote), invitations, memberships
-- Temporary and permanent rooms; DB persistence for permanent rooms
-- CORS and cookie parsing, structured error handling
+- **WebRTC Signaling** — SDP offer/answer, ICE candidate exchange
+- **Room Management** — Temporary (in-memory) and permanent (DB) rooms
+- **Real-time Chat** — Messages with typing indicators, stored in DB
+- **Invitation System** — Send/accept/decline with live notifications
+- **Admin Controls** — Kick, promote, demote members
+- **Authentication** — JWT with httpOnly cookies, email verification
 
 ## Project Structure
 
 ```
 backend/
-├── server.js              # Express + Socket.IO setup and events
-├── routes/                # REST routes (auth.js, chat.js)
+├── server.js              # Express + Socket.IO setup
+├── socket/
+│   ├── index.js           # Socket.IO initialization, register-user
+│   ├── userSocketMap.js   # userId → socketId mapping
+│   └── handlers/
+│       ├── room.js        # Room join/leave/create (22KB)
+│       ├── webrtc.js      # Offer/answer/ICE forwarding
+│       ├── chat.js        # Messages, typing indicators
+│       ├── invitation.js  # Invite send/accept/decline/cancel
+│       ├── memberAdmin.js # Kick/promote/demote
+│       └── screenShare.js # Screen share notifications
+├── routes/
+│   ├── auth.js            # Auth endpoints
+│   └── chat.js            # Chat endpoints
 ├── src/
-│   ├── db.js              # Drizzle connection
-│   ├── schema.js          # Drizzle schema
-│   ├── services/          # chatService, roomService
-│   └── middleware/        # errorHandler, notFound
+│   ├── controllers/       # authController, chatController
+│   ├── services/          # authService, chatService, roomService
+│   ├── middleware/        # auth, errorHandler
+│   ├── schema.js          # Drizzle schema (users, rooms, messages, invitations)
+│   └── db.js              # Drizzle connection
 ├── drizzle/               # Generated migrations
 └── drizzle.config.js      # Drizzle CLI config
 ```
 
 ## Environment Variables
 
-- `PORT` (default: 8000)
-- `NODE_ENV` (development|production)
-- `CORS_ORIGIN` (frontend origin, e.g., http://localhost:4000)
-- Database connection (used by drizzle):
-  - Either `DATABASE_URL`
-  - Or discrete values: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
-- (If auth uses JWT) `JWT_SECRET`
+```env
+PORT=8000
+NODE_ENV=development
+CORS_ORIGIN=http://localhost:4000
+JWT_SECRET=your-secret-key
 
-## API Endpoints
+# Database
+DATABASE_URL=postgresql://user:pass@localhost:5432/videocall
 
-- `GET /` — health/info
-- `POST /api/rooms/check` — room existence/status
+# Email (choose one)
+RESEND_API_KEY=re_xxxxx        # Production
+# Or Ethereal auto-generates dev credentials
+```
 
-Auth (prefix: `/api/auth`)
+## REST API Endpoints
 
-- `POST /api/auth/register` — Register new user
-- `POST /api/auth/login` — Login
-- `POST /api/auth/logout` — Logout (auth required)
-- `GET /api/auth/profile` — Get profile (auth required)
-- `PUT /api/auth/profile` — Update profile (auth required)
-- `PUT /api/auth/change-password` — Change password (auth required)
-- `DELETE /api/auth/account` — Delete account (auth required)
-- `GET /api/auth/verify` — Verify token (auth required)
-- `GET /api/auth/users/search` — Search users (auth required)
+### Auth (`/api/auth`)
 
-Chat (prefix: `/api/chat`)
+| Method | Endpoint                 | Auth | Description              |
+| ------ | ------------------------ | ---- | ------------------------ |
+| POST   | `/register`              | No   | Register new user        |
+| POST   | `/login`                 | No   | Login, get JWT cookie    |
+| POST   | `/logout`                | Yes  | Clear JWT cookie         |
+| GET    | `/profile`               | Yes  | Get current user         |
+| PUT    | `/profile`               | Yes  | Update username          |
+| PUT    | `/change-password`       | Yes  | Change password          |
+| DELETE | `/account`               | Yes  | Delete account           |
+| GET    | `/verify`                | Yes  | Verify JWT               |
+| GET    | `/users/search`          | Yes  | Search users by username |
+| GET    | `/verify-email/:token`   | No   | Verify email             |
+| POST   | `/forgot-password`       | No   | Request password reset   |
+| POST   | `/reset-password/:token` | No   | Reset password           |
 
-- `GET /api/chat/room/:roomId/recent` — Recent messages (public)
-- `GET /api/chat/room/:roomId/count` — Message count (public)
-- `GET /api/chat/room/:roomId` — Paginated messages (auth required)
-- `GET /api/chat/room/:roomId/search` — Search messages (auth required)
-- `GET /api/chat/room/:roomId/activity` — Activity summary (auth required)
-- `GET /api/chat/room/:roomId/by-date-range` — Messages by date range (auth required)
-- `GET /api/chat/message/:messageId` — Get message by ID (auth required)
-- `PUT /api/chat/message/:messageId` — Edit message (auth required)
-- `DELETE /api/chat/message/:messageId` — Delete message (auth required)
-- `GET /api/chat/user/messages` — Current user's messages (auth required)
+### Chat (`/api/chat`)
 
-## Socket.IO Events (Server)
+| Method | Endpoint               | Auth | Description        |
+| ------ | ---------------------- | ---- | ------------------ |
+| GET    | `/room/:roomId/recent` | No   | Last 50 messages   |
+| GET    | `/room/:roomId/count`  | No   | Message count      |
+| GET    | `/room/:roomId`        | Yes  | Paginated messages |
+| GET    | `/room/:roomId/search` | Yes  | Search messages    |
+| PUT    | `/message/:messageId`  | Yes  | Edit message       |
+| DELETE | `/message/:messageId`  | Yes  | Delete message     |
 
-- Signaling: `join-room`, `offer`, `answer`, `ice-candidate`
-- Screen sharing: `screen-share-started`, `screen-share-stopped`
-- Chat: `chat-message`, `typing`, `stop-typing`
-- Room membership/admin:
-  - `kick-user`, `promote-user`, `demote-user`
-  - `get-user-rooms`, `get-room-info`
-  - `add-room-member`, `remove-room-member`, `update-member-admin`
-  - `delete-permanent-room`, `leave-room`
-- Invitations:
-  - `send-room-invitation`, `accept-room-invitation`, `decline-room-invitation`, `cancel-room-invitation`
+### Rooms (`/api/rooms`)
 
-## Drizzle ORM & Migrations
+| Method | Endpoint | Auth | Description                |
+| ------ | -------- | ---- | -------------------------- |
+| POST   | `/check` | No   | Check room status/password |
 
-- Config: `drizzle.config.js`
-- Output: `drizzle/`
+## Socket.IO Events
 
-Common commands:
+### Connection & Registration
 
-- Generate SQL: `npx drizzle-kit generate`
-- Push schema: `npx drizzle-kit push`
+| Event             | Direction       | Description                              |
+| ----------------- | --------------- | ---------------------------------------- |
+| `register-user`   | Client → Server | Map userId to socketId for notifications |
+| `user-registered` | Server → Client | Confirm registration                     |
 
-## Local Development
+### Room & WebRTC
 
-1. Install deps: `npm install`
-2. Create `.env` with the variables above
-3. Start dev: `npm run dev` (or prod: `npm start`)
-4. Server default: http://localhost:8000
+| Event              | Direction       | Description                      |
+| ------------------ | --------------- | -------------------------------- |
+| `join-room`        | Client → Server | Join room with username/password |
+| `all-users`        | Server → Client | List of existing room users      |
+| `user-joined`      | Server → Client | New user joined notification     |
+| `user-left`        | Server → Client | User left notification           |
+| `offer` / `answer` | Client ↔ Server | WebRTC SDP exchange              |
+| `ice-candidate`    | Client ↔ Server | ICE candidate exchange           |
 
-## Deployment
+### Chat
 
-- Provide managed PostgreSQL and set `DATABASE_URL`
-- Set `CORS_ORIGIN` to your frontend origin
-- Serve behind HTTPS in production (for WebRTC clients)
+| Event                                 | Direction       | Description          |
+| ------------------------------------- | --------------- | -------------------- |
+| `chat-message`                        | Client ↔ Server | Send/receive message |
+| `typing` / `stop-typing`              | Client → Server | Typing indicators    |
+| `user-typing` / `user-stopped-typing` | Server → Client | Broadcast typing     |
 
-## Troubleshooting
+### Invitations
 
-- CORS errors: verify `CORS_ORIGIN` matches frontend origin exactly
-- Socket connection issues: confirm ports and that server is reachable
-- WebRTC in production: ensure HTTPS
-- DB errors: verify `DATABASE_URL` or discrete DB vars and network access
+| Event                      | Direction       | Description         |
+| -------------------------- | --------------- | ------------------- |
+| `send-room-invitation`     | Client → Server | Send invite         |
+| `room-invitation-received` | Server → Client | Notify invitee      |
+| `accept-room-invitation`   | Client → Server | Accept invite       |
+| `decline-room-invitation`  | Client → Server | Decline invite      |
+| `get-user-invitations`     | Client → Server | Get pending invites |
+
+### Admin Controls
+
+| Event          | Direction       | Description           |
+| -------------- | --------------- | --------------------- |
+| `kick-user`    | Client → Server | Remove user from room |
+| `promote-user` | Client → Server | Make user admin       |
+| `demote-user`  | Client → Server | Remove admin status   |
+
+## Development
+
+```bash
+npm install
+cp example.env .env   # Edit with your values
+npx drizzle-kit push  # Create tables
+npm run dev           # Start with nodemon
+```
+
+## Database Commands
+
+```bash
+npx drizzle-kit generate  # Generate migration SQL
+npx drizzle-kit push      # Push schema to DB
+npx drizzle-kit studio    # Open Drizzle Studio
+```
 
 ## License
 

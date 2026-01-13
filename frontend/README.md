@@ -1,241 +1,125 @@
 # VideoCallApp Frontend
 
-React + Vite client for the VideoCallApp. Connects to the backend via REST and Socket.IO, implements WebRTC media sessions, and provides a responsive UI with Tailwind and shadcn/ui.
+React + Vite client with WebRTC, Socket.IO, and responsive UI.
 
 ## Features
 
-- 🎥 **Real-time Video Calls**: Instant video streaming using WebRTC
-- 🔒 **Secure Rooms**: Password-protected rooms for privacy
-- 👥 **Multi-participant**: Support for up to 5 users per room
-- 📱 **Responsive Design**: Beautiful UI that works on all devices
-- ⚡ **Instant Connection**: No call/answer flow - immediate streaming
-- 🎨 **Dynamic Layouts**: Automatic grid layout based on participant count
-- 🎛️ **Media Controls**: Mute/unmute, video on/off, leave room
+- **Video Calls** — P2P mesh connections via WebRTC
+- **Screen Sharing** — Track replacement without renegotiation
+- **Recording** — VP9/VP8 codec detection, grid recording
+- **Screenshots** — Individual streams or full grid
+- **Chat** — Real-time messaging with typing indicators
+- **Room Dashboard** — Manage permanent rooms
+- **Authentication** — JWT with email verification
 
 ## Tech Stack
 
-### Frontend
-
-- React (Vite)
-- Tailwind CSS
-- shadcn/ui
+- React + Vite
+- TailwindCSS + shadcn/ui
+- Zustand (state management)
 - Socket.IO Client
 - WebRTC
-
-### Backend
-
-- Node.js + Express + Socket.IO
-- Drizzle ORM (PostgreSQL)
 
 ## Project Structure
 
 ```
-VideoCallApp/
-├── frontend/                 # React frontend application
-│   ├── src/
-│   │   ├── components/       # Reusable UI components
-│   │   │   └── ui/          # shadcn/ui components
-│   │   ├── pages/           # Page components
-│   │   │   ├── HomePage.jsx # Landing page
-│   │   │   └── RoomPage.jsx # Video call interface
-│   │   ├── lib/             # Utility functions
-│   │   ├── App.jsx          # Main app component
-│   │   └── main.jsx         # App entry point
-│   ├── public/              # Static assets
-│   └── package.json         # Frontend dependencies
-├── backend/                 # Node.js backend server
-│   ├── server.js            # Socket.IO server
-│   └── package.json         # Backend dependencies
-└── README.md               # This file
+frontend/src/
+├── pages/
+│   ├── LandingPage.jsx      # Home
+│   ├── RoomPage.jsx         # Video call interface
+│   ├── RoomDashboardPage.jsx# Room management
+│   ├── UserProfilePage.jsx  # User settings
+│   ├── LoginPage.jsx
+│   ├── RegisterPage.jsx
+│   └── ...
+├── components/
+│   ├── room/                # Video grid, controls
+│   ├── chat/                # Chat panel, messages
+│   ├── auth/                # Protected routes
+│   ├── modals/              # Room management modals
+│   └── ui/                  # shadcn/ui components
+├── hooks/
+│   ├── useWebRTC.js         # Core WebRTC logic
+│   ├── useScreenShare.js    # Screen sharing
+│   ├── useVideoRecording.js # MediaRecorder
+│   ├── useScreenshot.js     # Canvas capture
+│   ├── useMediaControls.js  # Mute/unmute
+│   └── useKeyboardShortcuts.js
+├── contexts/
+│   └── SocketContext.jsx    # Shared socket
+├── stores/
+│   ├── authStore.js         # Auth state
+│   └── chatStore.js         # Messages, typing
+└── utils/
+    └── api.js               # REST API client
 ```
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js (v16 or higher)
-- npm or yarn
-
-### Installation
-
-1. **Clone the repository**
-
-   ```bash
-   git clone <repository-url>
-   cd VideoCallApp
-   ```
-
-2. **Install backend dependencies**
-
-   ```bash
-   cd backend
-   npm install
-   ```
-
-3. **Install frontend dependencies**
-   ```bash
-   cd ../frontend
-   npm install
-   ```
-
-### Running the Application
-
-1. **Start the backend server**
-
-   ```bash
-   cd backend
-   npm start
-   ```
-
-   The server will run on the configured backend URL (default: `http://localhost:8000`)
-
-2. **Start the frontend development server**
-
-   ```bash
-   cd frontend
-   npm run dev
-   ```
-
-   The frontend will run on `http://localhost:5173`
-
-3. **Open your browser**
-   Navigate to `http://localhost:5173` to access the application
-
-## Usage
-
-### Creating a Room
-
-1. Enter your name
-2. Optionally enter a custom room ID (or leave empty for auto-generation)
-3. Set a secure password for the room
-4. Click "Create Room"
-
-### Joining a Room
-
-1. Enter your name
-2. Enter the room ID you want to join
-3. Enter the room password
-4. Click "Join Room"
-
-### During a Call
-
-- **Mute/Unmute**: Click the microphone icon
-- **Video On/Off**: Click the video camera icon
-- **Leave Room**: Click the phone icon
-- **Participant Count**: See how many people are in the room (max 5)
-
-## Features in Detail
-
-### Dynamic Video Layouts
-
-The application automatically adjusts the video grid layout based on the number of participants:
-
-- 1 person: Single large view
-- 2 people: Side-by-side
-- 3-4 people: 2x2 grid
-- 5 people: 3x2 grid
-
-### Local Video Positioning
-
-Your own video appears in a smaller window in the bottom-right corner with a mirror effect for natural interaction.
-
-### Room Management
-
-- **Password Protection**: All rooms require a password
-- **User Limit**: Maximum 5 users per room
-- **Auto-cleanup**: Empty rooms are automatically deleted
-- **Real-time Updates**: See when users join or leave
-
-### WebRTC Features
-
-- **STUN Servers**: Configured for NAT traversal
-- **Peer-to-Peer**: Direct connections between users
-- **Media Controls**: Independent audio/video control
-- **Connection Management**: Automatic reconnection handling
-
-## Configuration
-
-### Environment Variables
-
-The frontend uses Vite environment variables to configure the backend URL. Create a `.env` file in the frontend directory:
+## Environment Variables
 
 ```env
-# Backend URL configuration
 VITE_BACKEND_URL=http://localhost:8000
 ```
 
-Notes:
+## Quick Start
 
-- `VITE_` prefix is required for Vite to expose variables to the client.
-- In development, ensure this matches the backend port (default http://localhost:8000).
+```bash
+npm install
+cp .env.example .env   # Set VITE_BACKEND_URL
+npm run dev            # Starts on localhost:4000
+```
 
-### Backend Configuration
+## Key Hooks
 
-The backend server can be configured via environment variables:
+### useWebRTC
 
-- `PORT`: Server port (default: 8000)
-- `NODE_ENV`: Environment (development/production)
+- Creates peer connections for each user
+- Handles SDP offer/answer exchange
+- Manages ICE candidates
+- Cleans up connections on leave
 
-## Browser Compatibility
+### useScreenShare
 
-This application requires modern browsers with WebRTC support:
+- Uses `getDisplayMedia()` for screen capture
+- Replaces video track via `RTCRtpSender.replaceTrack()`
+- Restores camera on stop
+
+### useVideoRecording
+
+- Records local stream, screen share, or grid view
+- Grid recording composites videos on canvas
+- Supports VP9/VP8 codec selection
+
+### useScreenshot
+
+- Captures individual video elements
+- Full grid capture via canvas composition
+- Downloads as PNG
+
+## Room Types
+
+| Type      | Auth Required | Persistence            | Features                           |
+| --------- | ------------- | ---------------------- | ---------------------------------- |
+| Temporary | No            | In-memory, auto-delete | Basic video/chat                   |
+| Permanent | Yes           | PostgreSQL             | Invites, admin controls, dashboard |
+
+## Keyboard Shortcuts
+
+| Key   | Action              |
+| ----- | ------------------- |
+| `M`   | Toggle mute         |
+| `V`   | Toggle video        |
+| `S`   | Toggle screen share |
+| `Esc` | Leave room          |
+
+## Browser Support
 
 - Chrome 56+
 - Firefox 52+
 - Safari 11+
 - Edge 79+
 
-## Security Considerations
-
-- **HTTPS Required**: WebRTC requires HTTPS in production
-- **Password Protection**: All rooms are password-protected
-- **User Limits**: Prevents room overcrowding
-- **Input Validation**: All user inputs are validated
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Camera/Microphone Access Denied**
-
-   - Ensure you've granted permission to access media devices
-   - Check browser settings for camera/microphone permissions
-
-2. **Connection Issues**
-
-   - Verify the backend server is running
-   - Check network connectivity
-   - Ensure firewall allows WebRTC traffic
-
-3. **Room Full Error**
-
-   - Maximum 5 users per room
-   - Create a new room or wait for someone to leave
-
-4. **Video Not Displaying**
-   - Check if camera is being used by another application
-   - Try refreshing the page
-   - Verify WebRTC support in your browser
-
-## Development
-
-### Adding New Features
-
-1. Frontend changes go in `frontend/src/`
-2. Backend changes go in `backend/`
-3. UI components use shadcn/ui for consistency
-
-### Code Style
-
-- Use functional components with hooks
-- Follow React best practices
-- Use Tailwind CSS for styling
-- Add comments for complex logic
+**Note:** HTTPS required in production for WebRTC.
 
 ## License
 
-This project is open source and available under the MIT License.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+MIT

@@ -16,24 +16,38 @@ const Chat = memo(
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-    const [historyLoaded, setHistoryLoaded] = useState(false);
     const typingTimeoutRef = useRef(null);
     const messageInputRef = useRef(null);
 
-    // Use local state for messages and typing to prevent parent re-renders
-    const [messages, setMessages] = useState([]);
+    // Use global chatStore for messages to persist across panel open/close
+    const messages = useChatStore((state) => state.messages);
+    const currentRoomId = useChatStore((state) => state.currentRoomId);
+    const addMessage = useChatStore((state) => state.addMessage);
+    const setRoomMessages = useChatStore((state) => state.setRoomMessages);
+    const setCurrentRoom = useChatStore((state) => state.setCurrentRoom);
+    const setChatOpen = useChatStore((state) => state.setChatOpen);
+
+    // Local state for typing users (doesn't need persistence)
     const [typingUsers, setTypingUsers] = useState([]);
 
-    // Get setChatOpen function directly from store to avoid hook re-renders
-    const setChatOpen = useChatStore.getState().setChatOpen;
-
-    // Load chat history when component mounts
+    // Load chat history when room changes (not on every mount)
     const loadChatHistory = useCallback(async () => {
-      if (!roomId || historyLoaded) return;
+      // Only load if room changed or no messages exist
+      if (!roomId) return;
+
+      // If room hasn't changed and we have messages, don't reload
+      if (currentRoomId === roomId && messages.length > 0) {
+        console.log("📚 Chat history already loaded for room:", roomId);
+        return;
+      }
 
       setIsLoadingHistory(true);
       try {
         console.log("📚 Loading chat history for room:", roomId);
+
+        // Set current room in store
+        setCurrentRoom(roomId);
+
         const response = await chatAPI.getRecentMessages(roomId, 50);
 
         if (response.success && response.data) {
@@ -51,8 +65,7 @@ const Chat = memo(
             type: msg.messageType || "text",
             roomId: msg.roomId,
           }));
-          setMessages(formattedMessages);
-          setHistoryLoaded(true);
+          setRoomMessages(formattedMessages);
         }
       } catch (error) {
         console.error("❌ Failed to load chat history:", error);
@@ -60,7 +73,13 @@ const Chat = memo(
       } finally {
         setIsLoadingHistory(false);
       }
-    }, [roomId, historyLoaded]);
+    }, [
+      roomId,
+      currentRoomId,
+      messages.length,
+      setCurrentRoom,
+      setRoomMessages,
+    ]);
 
     // Set current room when component mounts
     useEffect(() => {
@@ -93,12 +112,12 @@ const Chat = memo(
             type: data.type || "text",
             roomId: data.roomId,
           };
-          setMessages((prev) => [...prev, newMessage]);
+          addMessage(newMessage);
         } else {
           console.log("⏭️ Skipped own message (already added when sending)");
         }
       },
-      [username]
+      [username, addMessage]
     );
 
     const handleUserTyping = useCallback(
@@ -144,7 +163,8 @@ const Chat = memo(
       console.error("❌ Chat error:", error);
     }, []);
 
-    // Socket event listeners - ONLY real-time messaging, no history
+    // Socket event listeners - chat-message handled at RoomPage level
+    // This only handles typing indicators and errors
     useEffect(() => {
       const socket = socketRef.current;
       if (!socket) {
@@ -152,26 +172,17 @@ const Chat = memo(
         return;
       }
 
-      console.log("🔌 Setting up chat socket listeners");
+      console.log("🔌 Setting up chat typing listeners");
 
-      // Only listen to real-time events
-      socket.on("chat-message", handleNewMessage);
+      // chat-message is handled at RoomPage level to persist when panel is closed
       socket.on("chat-message-sent", handleMessageSent);
       socket.on("chat-error", handleChatError);
       socket.on("user-typing", handleUserTyping);
       socket.on("user-stopped-typing", handleUserStoppedTyping);
 
-      // Debug: Listen to all socket events to see what's being received
-      socket.onAny((eventName, ...args) => {
-        if (eventName.includes("chat") || eventName.includes("message")) {
-          console.log("🔍 Socket event received:", eventName, args);
-        }
-      });
-
-      console.log("✅ Socket event listeners set up successfully");
+      console.log("✅ Chat listeners set up successfully");
 
       return () => {
-        socket.off("chat-message", handleNewMessage);
         socket.off("chat-message-sent", handleMessageSent);
         socket.off("chat-error", handleChatError);
         socket.off("user-typing", handleUserTyping);
@@ -181,7 +192,6 @@ const Chat = memo(
       socketRef,
       username,
       roomId,
-      handleNewMessage,
       handleUserTyping,
       handleUserStoppedTyping,
       handleMessageSent,
@@ -209,8 +219,8 @@ const Chat = memo(
         messageData.message
       );
 
-      // Add message to local state for immediate display
-      setMessages((prev) => [...prev, messageData]);
+      // Add message to store for immediate display (persists across panel open/close)
+      addMessage(messageData);
 
       // Send message to other users via WebSocket (backend will save to database)
       socketRef.current.emit("chat-message", messageData);
@@ -266,7 +276,7 @@ const Chat = memo(
       }
     };
 
-    // Use local state instead of global store
+    // Use store messages and local typing users
     const currentMessages = messages;
     const currentTypingUsers = typingUsers;
 
