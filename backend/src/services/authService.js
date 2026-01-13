@@ -201,7 +201,8 @@ export const register = async (userData) => {
     totalCalls: 0,
     totalDuration: 0,
     lastActive: new Date(),
-    isVerified: isDevelopment, // Auto-verify in development
+    // isVerified: isDevelopment, // Auto-verify in development
+    isVerified: true, //temporary auto verify due to resend domain verification issue
     isActive: true,
     verificationToken: isDevelopment ? null : verificationToken,
     verificationTokenExpiry: isDevelopment ? null : verificationTokenExpiry,
