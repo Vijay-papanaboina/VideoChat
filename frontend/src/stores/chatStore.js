@@ -99,50 +99,39 @@ export const useChatStore = create((set) => ({
 }));
 
 /**
- * Hook for chat actions
+ * Hook for chat actions - uses getState() for stable references
+ * These actions are stable and won't cause re-renders when destructured
  */
 export const useChatActions = () => {
-  const {
-    addMessage,
-    addMultipleMessages,
-    setRoomMessages,
-    clearMessages,
-    toggleChat,
-    setChatOpen,
-    setTyping,
-    addTypingUser,
-    removeTypingUser,
-    clearTypingUsers,
-    setCurrentRoom,
-  } = useChatStore();
+  // Get actions directly from store - these are stable references
+  const store = useChatStore.getState();
 
   return {
-    addMessage,
-    addMultipleMessages,
-    setRoomMessages,
-    clearMessages,
-    toggleChat,
-    setChatOpen,
-    setTyping,
-    addTypingUser,
-    removeTypingUser,
-    clearTypingUsers,
-    setCurrentRoom,
+    addMessage: store.addMessage,
+    addMultipleMessages: store.addMultipleMessages,
+    setRoomMessages: store.setRoomMessages,
+    clearMessages: store.clearMessages,
+    toggleChat: store.toggleChat,
+    setChatOpen: store.setChatOpen,
+    setTyping: store.setTyping,
+    addTypingUser: store.addTypingUser,
+    removeTypingUser: store.removeTypingUser,
+    clearTypingUsers: store.clearTypingUsers,
+    setCurrentRoom: store.setCurrentRoom,
   };
 };
 
 /**
- * Hook for chat state
+ * Hook for chat state - uses individual selectors to prevent over-subscription
+ * Components only re-render when the specific state they use changes
  */
 export const useChatState = () => {
-  const {
-    messages,
-    isChatOpen,
-    currentRoomId,
-    isTyping,
-    typingUsers,
-    unreadCount,
-  } = useChatStore();
+  const messages = useChatStore((state) => state.messages);
+  const isChatOpen = useChatStore((state) => state.isChatOpen);
+  const currentRoomId = useChatStore((state) => state.currentRoomId);
+  const isTyping = useChatStore((state) => state.isTyping);
+  const typingUsers = useChatStore((state) => state.typingUsers);
+  const unreadCount = useChatStore((state) => state.unreadCount);
 
   return {
     messages,

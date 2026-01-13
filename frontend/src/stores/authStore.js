@@ -323,48 +323,40 @@ export const useAuthStore = create((set) => ({
 }));
 
 /**
- * Hook for auth actions
+ * Hook for auth actions - uses getState() for stable references
+ * These actions are stable and won't cause re-renders when destructured
  */
 export const useAuthActions = () => {
-  const {
-    setUser,
-    setLoading,
-    setError,
-    clearError,
-    checkAuth,
-    login,
-    register,
-    logout,
-    updateProfile,
-    changePassword,
-    deleteAccount,
-    hideNavbar,
-    showNavbarAction,
-  } = useAuthStore();
+  // Get actions directly from store - these are stable references
+  const store = useAuthStore.getState();
 
   return {
-    setUser,
-    setLoading,
-    setError,
-    clearError,
-    checkAuth,
-    login,
-    register,
-    logout,
-    updateProfile,
-    changePassword,
-    deleteAccount,
-    hideNavbar,
-    showNavbarAction,
+    setUser: store.setUser,
+    setLoading: store.setLoading,
+    setError: store.setError,
+    clearError: store.clearError,
+    checkAuth: store.checkAuth,
+    login: store.login,
+    register: store.register,
+    logout: store.logout,
+    updateProfile: store.updateProfile,
+    changePassword: store.changePassword,
+    deleteAccount: store.deleteAccount,
+    hideNavbar: store.hideNavbar,
+    showNavbarAction: store.showNavbarAction,
   };
 };
 
 /**
- * Hook for auth state
+ * Hook for auth state - uses individual selectors to prevent over-subscription
+ * Components only re-render when the specific state they use changes
  */
 export const useAuthState = () => {
-  const { user, isAuthenticated, isLoading, error, showNavbar } =
-    useAuthStore();
+  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isLoading = useAuthStore((state) => state.isLoading);
+  const error = useAuthStore((state) => state.error);
+  const showNavbar = useAuthStore((state) => state.showNavbar);
 
   return {
     user,
